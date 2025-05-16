@@ -53,13 +53,34 @@ if (addGlobalActivityButton) {
                 return;
             }
             availableActivities.push(trimmedName);
-            console.log('Available Activities:', availableActivities);
+            renderActivityPalette();
+        });
+    });
+}
+
+// Synchronize activity cell text to campGroups data model before export
+function syncActivityCellsToDataModel() {
+    const selectedCamp = campSelector.value;
+    const groupList = campGroups[selectedCamp];
+    if (!groupList) return;
+    document.querySelectorAll('.group-table').forEach((table, groupIdx) => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach((row, activityIdx) => {
+            const cell = row.cells[1];
+            if (cell && groupList[groupIdx] && groupList[groupIdx].activities[activityIdx]) {
+                // Remove delete icon if present
+                const name = cell.textContent.replace(/\s*\u00D7\s*$/, '').trim();
+                groupList[groupIdx].activities[activityIdx].name = name;
+            }
         });
     });
 }
 
 if (exportCampButton) {
     exportCampButton.addEventListener('click', () => {
+        // Sync UI to data model before exporting
+        syncActivityCellsToDataModel();
+
         const selectedCampName = campSelector.value;
 
         if (!selectedCampName) {
@@ -293,6 +314,122 @@ function loadGroupsForCamp(campName) {
     groups.forEach((group, index) => {
         createGroupBox(group.name, index, campName);
     });
+    // After all groups and activities are loaded, make activities draggable
+    makeActivitiesDraggable();
+    // Save activity names from table cells to group data
+    const groupList = campGroups[campName];
+    if (groupList) {
+        document.querySelectorAll('.group-table').forEach((table, groupIdx) => {
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach((row, activityIdx) => {
+                const cell = row.cells[1];
+                if (cell) {
+                    const name = cell.textContent.replace(/\s*\u00D7\s*$/, '').trim(); // Remove delete icon if present
+                    if (groupList[groupIdx] && groupList[groupIdx].activities[activityIdx]) {
+                        groupList[groupIdx].activities[activityIdx].name = name;
+                    }
+                }
+            });
+        });
+    }
+}
+
+// Syncs the visible activity names in the group tables back to the campGroups data model
+function syncActivityCellsToDataModel() {
+    const selectedCamp = campSelector.value;
+    const groupList = campGroups[selectedCamp];
+    if (!groupList) return;
+    document.querySelectorAll('.group-table').forEach((table, groupIdx) => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach((row, activityIdx) => {
+            const cell = row.cells[1];
+            if (cell && groupList[groupIdx] && groupList[groupIdx].activities[activityIdx]) {
+                // Extract only the text node (activity name), ignore icons
+                let name = '';
+                if (cell.childNodes.length > 0 && cell.childNodes[0].nodeType === Node.TEXT_NODE) {
+                    name = cell.childNodes[0].textContent.trim();
+                } else {
+                    name = cell.textContent.replace(/\s*\u00D7\s*$/, '').trim();
+                }
+                groupList[groupIdx].activities[activityIdx].name = name;
+            }
+        });
+    });
+}
+
+// Render the available activities palette
+function renderActivityPalette() {
+    const palette = document.getElementById('activity-palette');
+    if (!palette) return;
+    palette.innerHTML = '';
+    availableActivities.forEach(activityName => {
+        const item = document.createElement('div');
+        item.className = 'activity-palette-item';
+        item.textContent = activityName;
+        item.setAttribute('draggable', 'true');
+        item.addEventListener('dragstart', function (e) {
+            e.dataTransfer.setData('text/plain', activityName);
+            item.classList.add('dragging');
+        });
+        item.addEventListener('dragend', function () {
+            item.classList.remove('dragging');
+        });
+        palette.appendChild(item);
+    });
+}
+
+// Make group table activity cells droppable
+function makeActivityCellsDroppable() {
+    document.querySelectorAll('.group-table tbody td:nth-child(2)').forEach(cell => {
+        cell.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            cell.style.background = '#e0ffe0';
+        });
+        cell.addEventListener('dragleave', function () {
+            cell.style.background = '';
+        });
+        cell.addEventListener('drop', function (e) {
+            e.preventDefault();
+            cell.style.background = '';
+            const activityName = e.dataTransfer.getData('text/plain');
+            if (activityName) {
+                // Remove dropdown if present
+                const dropdown = cell.querySelector('select.activity-dropdown');
+                if (dropdown) dropdown.remove();
+                // Set cell text to activity name
+                cell.textContent = activityName;
+                // Add delete icon back
+                const deleteActivityIcon = document.createElement('i');
+                deleteActivityIcon.className = 'fas fa-times action-icon';
+                deleteActivityIcon.title = 'Delete Activity';
+                deleteActivityIcon.style.color = '#d9534f';
+                deleteActivityIcon.style.cursor = 'pointer';
+                deleteActivityIcon.style.marginLeft = '10px';
+                deleteActivityIcon.addEventListener('click', () => {
+                    // Find group/camp context
+                    const row = cell.parentElement;
+                    const table = row.closest('.group-table');
+                    const groupIdx = Array.from(document.querySelectorAll('.group-table')).indexOf(table);
+                    const activityIdx = Array.from(table.querySelectorAll('tbody tr')).indexOf(row);
+                    const selectedCamp = campSelector.value;
+                    if (campGroups[selectedCamp] && campGroups[selectedCamp][groupIdx]) {
+                        campGroups[selectedCamp][groupIdx].activities.splice(activityIdx, 1);
+                    }
+                    row.remove();
+                });
+                cell.appendChild(deleteActivityIcon);
+                // Update data model immediately
+                const row = cell.parentElement;
+                const table = row.closest('.group-table');
+                const groupIdx = Array.from(document.querySelectorAll('.group-table')).indexOf(table);
+                const activityIdx = Array.from(table.querySelectorAll('tbody tr')).indexOf(row);
+                const selectedCamp = campSelector.value;
+                if (campGroups[selectedCamp] && campGroups[selectedCamp][groupIdx] && campGroups[selectedCamp][groupIdx].activities[activityIdx]) {
+                    campGroups[selectedCamp][groupIdx].activities[activityIdx].name = activityName;
+                }
+            }
+        });
+    });
 }
 
 function createActivitySelector(selectedActivityName) {
@@ -348,6 +485,83 @@ document.addEventListener('DOMContentLoaded', () => {
     else {
         infoBox.textContent = 'Select a camp to see or add information.';
     }
+
+    // Make activities in the group table draggable
+    function makeActivitiesDraggable() {
+        document.querySelectorAll('.group-table tbody tr').forEach(row => {
+            row.setAttribute('draggable', 'true');
+            row.addEventListener('dragstart', function (e) {
+                // Only send the activity name, not the whole row
+                const activityCell = row.querySelector('td:nth-child(2) select');
+                let activityName = '';
+                if (activityCell) {
+                    activityName = activityCell.value || activityCell.options[activityCell.selectedIndex]?.text || '';
+                } else {
+                    // fallback: get text content of second cell
+                    const cell = row.querySelector('td:nth-child(2)');
+                    activityName = cell ? cell.textContent.trim() : '';
+                }
+                e.dataTransfer.setData('text/plain', activityName);
+                row.classList.add('dragging');
+            });
+            row.addEventListener('dragend', function () {
+                row.classList.remove('dragging');
+            });
+        });
+    }
+
+    // Call this after activities are added dynamically
+    // Example: makeActivitiesDraggable();
+
+    // Drop area drag-and-drop logic
+    const dropBox = document.getElementById('drop-box');
+    function updateDropBoxPlaceholder() {
+        if (dropBox.querySelectorAll('.activity-badge').length === 0) {
+            if (!dropBox.querySelector('.placeholder')) {
+                const placeholder = document.createElement('span');
+                placeholder.className = 'placeholder';
+                placeholder.textContent = 'Drag activities here!';
+                dropBox.appendChild(placeholder);
+            }
+        } else {
+            const placeholder = dropBox.querySelector('.placeholder');
+            if (placeholder) placeholder.remove();
+        }
+    }
+    dropBox.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        dropBox.style.background = '#e0ffe0';
+        dropBox.style.color = '#333';
+    });
+    dropBox.addEventListener('dragleave', function () {
+        dropBox.style.background = '#f9f9f9';
+        dropBox.style.color = '#888';
+    });
+    dropBox.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropBox.style.background = '#f9f9f9';
+        dropBox.style.color = '#888';
+        const activityText = e.dataTransfer.getData('text/plain');
+        if (activityText) {
+            const badge = document.createElement('span');
+            badge.textContent = activityText;
+            badge.className = 'activity-badge';
+            dropBox.appendChild(badge);
+        }
+        updateDropBoxPlaceholder();
+    });
+    // On page load, show placeholder if empty
+    updateDropBoxPlaceholder();
+
+    // If you add activities dynamically, call makeActivitiesDraggable() after adding them.
+    // For demo: add a sample row and make it draggable
+    const tbody = document.querySelector('.group-table tbody');
+    if (tbody && tbody.children.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td>09:00</td><td>Sample Activity</td>';
+        tbody.appendChild(tr);
+    }
+    makeActivitiesDraggable();
 });
 
 function normalizeId(name) {
@@ -534,25 +748,14 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
     timeSelector.addEventListener('change', (e) => {
         if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
             campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
-            console.log(`Time updated for activity "${activity.name}" to ${e.target.value}`);
+            console.log(`Time updated for activity to ${e.target.value}`);
         }
     });
     cellTime.appendChild(timeSelector);
 
     const cellActivity = row.insertCell();
-    cellActivity.style.display = 'flex';
-    cellActivity.style.justifyContent = 'space-between';
-    cellActivity.style.alignItems = 'center';
-
-    const activitySelector = createActivitySelector(activity.name);
-    activitySelector.addEventListener('change', (e) => {
-        if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
-            campGroups[campName][groupIndex].activities[activityIndex].name = e.target.value;
-            console.log(`Activity for group "${groupNameFromData(campName, groupIndex)}" at ${activity.time} updated to "${e.target.value}"`);
-        }
-    });
-    activitySelector.style.flexGrow = '1';
-    cellActivity.appendChild(activitySelector);
+    cellActivity.textContent = activity.name || '';
+    makeActivityCellsDroppable();
 
     const deleteActivityIcon = document.createElement('i');
     deleteActivityIcon.className = 'fas fa-times action-icon';
@@ -561,11 +764,8 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
     deleteActivityIcon.style.cursor = 'pointer';
     deleteActivityIcon.style.marginLeft = '10px';
     deleteActivityIcon.addEventListener('click', () => {
-        const currentActivityName = campGroups[campName][groupIndex].activities[activityIndex] ? campGroups[campName][groupIndex].activities[activityIndex].name : 'this activity';
-        if (confirm(`Delete activity "${currentActivityName}" at ${activity.time}?`)) {
-            campGroups[campName][groupIndex].activities.splice(activityIndex, 1);
-            row.remove();
-        }
+        campGroups[campName][groupIndex].activities.splice(activityIndex, 1);
+        row.remove();
     });
     cellActivity.appendChild(deleteActivityIcon);
 }

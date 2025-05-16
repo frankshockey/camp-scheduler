@@ -59,9 +59,36 @@ main {
     margin-left: 0; /* Remove spacing between menu and content */
 }
 
-/* Remove the dotted box styles */
-#drop-area {
-    display: none;
+/* Activity palette styles */
+#activity-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.activity-palette-item {
+    background: #e0f7fa;
+    color: #00796b;
+    padding: 0.4em 1em;
+    border-radius: 1em;
+    font-weight: bold;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-size: 1rem;
+    cursor: grab;
+    user-select: none;
+    transition: background 0.2s, color 0.2s;
+}
+
+.activity-palette-item:active {
+    background: #b2ebf2;
+    color: #004d40;
+    opacity: 0.8;
+}
+
+/* Remove drop area styles */
+#drop-area, #drop-box {
+    display: none !important;
 }
 
 /* Update the grey box for groups */
