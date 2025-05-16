@@ -18,6 +18,7 @@ const addCampButton = document.getElementById('add-camp-button');
 const currentCampHeading = document.getElementById('current-camp');
 const campSelector = document.getElementById('camp-selector');
 const campDisplaySpan = document.querySelector('#camp-display > span');
+const editCampButton = document.getElementById('edit-camp-button');
 
 defineFixedActivityPalette();
 
@@ -65,18 +66,6 @@ addCampButton.addEventListener('click', () => {
         updateCampInterface();
         campSelector.value = campName;
         loadGroupsForCamp(campName);
-
-        // Ensure the Edit Camp button is updated immediately after adding a camp
-        let editButton = document.getElementById('edit-camp-button');
-        if (!editButton) {
-            editButton = document.createElement('button');
-            editButton.id = 'edit-camp-button';
-            editButton.textContent = 'Edit Camp';
-            editButton.addEventListener('click', () => editCampName(campName));
-            currentCampHeading.insertAdjacentElement('afterend', editButton); // Place beside current camp heading
-        } else {
-            editButton.onclick = () => editCampName(campName);
-        }
     });
 });
 
@@ -136,7 +125,18 @@ function showModalInputWithColor(title, callback) {
     });
 }
 
-// Render the activity palette at the top
+// --- Selection state for click-to-assign workflow ---
+let selectedCellInfo = null; // { groupIndex, activityIndex, cellElement }
+
+// Helper to clear any selected cell highlight
+function clearSelectedCell() {
+    if (selectedCellInfo && selectedCellInfo.cellElement) {
+        selectedCellInfo.cellElement.classList.remove('selected-activity-cell');
+    }
+    selectedCellInfo = null;
+}
+
+// Patch renderActivityPalette to support click-to-assign to selected cell
 function renderActivityPalette() {
     const palette = document.getElementById('activity-palette');
     palette.innerHTML = '';
@@ -153,13 +153,22 @@ function renderActivityPalette() {
         });
         // Click-to-assign for accessibility
         badge.addEventListener('click', () => {
-            // Assign to the first empty row in ANY group, not just the first group
             const campName = campSelector.value;
             if (!campName || !campGroups[campName] || campGroups[campName].length === 0) {
                 showAlert('Please add a group to assign activities.');
                 return;
             }
-            // Try to find the first empty row in any group
+            // If a cell is selected, assign to that cell
+            if (selectedCellInfo) {
+                const { groupIndex, activityIndex } = selectedCellInfo;
+                if (campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
+                    campGroups[campName][groupIndex].activities[activityIndex].name = activity.name;
+                }
+                clearSelectedCell();
+                loadGroupsForCamp(campName);
+                return;
+            }
+            // Fallback: assign to first empty row in any group
             let assigned = false;
             for (let g = 0; g < campGroups[campName].length; g++) {
                 const group = campGroups[campName][g];
@@ -181,7 +190,81 @@ function renderActivityPalette() {
     });
 }
 
-// Synchronize activity cell text to campGroups data model before export
+// Patch addActivityToTable to allow selecting empty cells
+function addActivityToTable(activity, tableBody, campName, groupIndex, activityIndex) {
+    const row = tableBody.insertRow();
+
+    const cellTime = row.insertCell();
+    const timeSelector = createCustomTimeSelector(activity.time);
+    timeSelector.addEventListener('change', (e) => {
+        if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
+            campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
+        }
+    });
+    cellTime.appendChild(timeSelector);
+
+    const cellActivity = row.insertCell();
+    cellActivity.textContent = activity.name || '';
+    if (activity.name) {
+        const bg = getActivityColor(activity.name);
+        cellActivity.style.background = bg;
+        cellActivity.style.color = isColorDark(bg) ? '#fff' : '#222';
+        cellActivity.style.cursor = '';
+        cellActivity.onclick = null;
+    } else {
+        cellActivity.style.background = '';
+        cellActivity.style.color = '';
+        // Allow click-to-select for empty cells
+        cellActivity.style.cursor = 'pointer';
+        cellActivity.onclick = (e) => {
+            // Deselect previous
+            clearSelectedCell();
+            // Select this cell
+            cellActivity.classList.add('selected-activity-cell');
+            selectedCellInfo = { groupIndex, activityIndex, cellElement: cellActivity };
+            // Optionally, scroll palette into view for accessibility
+            document.getElementById('activity-palette').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+    }
+    // Always make droppable
+    makeActivityCellsDroppable();
+
+    // Add delete icon
+    const deleteActivityIcon = document.createElement('i');
+    deleteActivityIcon.className = 'fas fa-times action-icon';
+    deleteActivityIcon.title = 'Delete Activity';
+    deleteActivityIcon.style.color = '#d9534f';
+    deleteActivityIcon.style.cursor = 'pointer';
+    deleteActivityIcon.style.marginLeft = '10px';
+    deleteActivityIcon.addEventListener('click', () => {
+        campGroups[campName][groupIndex].activities.splice(activityIndex, 1);
+        loadGroupsForCamp(campName);
+    });
+    cellActivity.appendChild(deleteActivityIcon);
+
+    setTimeout(() => enableActivityRowReordering(tableBody, campName, groupIndex), 0);
+}
+
+// Deselect cell if clicking outside activity cells or palette
+window.addEventListener('mousedown', (e) => {
+    const palette = document.getElementById('activity-palette');
+    if (
+        selectedCellInfo &&
+        !e.target.classList.contains('activity-palette-item') &&
+        !e.target.classList.contains('selected-activity-cell') &&
+        !palette.contains(e.target)
+    ) {
+        clearSelectedCell();
+    }
+});
+
+// Add CSS for selected cell highlight
+(function addSelectedCellStyle() {
+    const style = document.createElement('style');
+    style.innerHTML = `.selected-activity-cell { outline: 3px solid #007bff !important; box-shadow: 0 0 0 2px #b3d7ff; }`;
+    document.head.appendChild(style);
+})();
+
 function syncActivityCellsToDataModel() {
     const selectedCamp = campSelector.value;
     const groupList = campGroups[selectedCamp];
@@ -390,6 +473,7 @@ function updateCampInterface() {
         }
         campSelector.style.display = 'none';
         currentCampHeading.textContent = 'Camp Scheduler';
+        editCampButton.style.display = 'none';
     } else if (camps.length === 1) {
         const campName = camps[0];
         const option = document.createElement('option');
@@ -404,6 +488,9 @@ function updateCampInterface() {
         }
         campSelector.style.display = 'none';
         currentCampHeading.textContent = `Current Camp: ${campName}`;
+        editCampButton.style.display = 'inline-block';
+        editCampButton.textContent = 'Edit Camp';
+        editCampButton.onclick = () => editCampName(campName);
     } else {
         camps.forEach((camp) => {
             const option = document.createElement('option');
@@ -421,6 +508,9 @@ function updateCampInterface() {
         if (campDisplaySpan) campDisplaySpan.style.display = 'none';
         campSelector.style.display = 'inline-block';
         currentCampHeading.textContent = `Current Camp: ${campSelector.value}`;
+        editCampButton.style.display = 'inline-block';
+        editCampButton.textContent = 'Edit Camp';
+        editCampButton.onclick = () => editCampName(campSelector.value);
     }
     console.log('Camp Selector Options:', campSelector.innerHTML);
 
@@ -447,6 +537,54 @@ function updateCampInterface() {
         }
     }
 }
+
+// --- Camp Info Box Synchronization ---
+function updateInfoBoxForSelectedCamp() {
+    if (!campDropdown || !infoBox) return;
+    const selectedCamp = campDropdown.value;
+    if (!selectedCamp || !campInfo[selectedCamp]) {
+        infoBox.innerText = 'Click here to add information about the selected camp.';
+    } else {
+        infoBox.innerText = campInfo[selectedCamp];
+    }
+}
+
+if (campDropdown && infoBox) {
+    campDropdown.addEventListener('change', () => {
+        updateInfoBoxForSelectedCamp();
+    });
+    // Save edits to campInfo on blur or input
+    infoBox.addEventListener('blur', () => {
+        const selectedCamp = campDropdown.value;
+        if (selectedCamp) {
+            campInfo[selectedCamp] = infoBox.innerText.trim();
+        }
+    });
+    infoBox.addEventListener('input', () => {
+        const selectedCamp = campDropdown.value;
+        if (selectedCamp) {
+            campInfo[selectedCamp] = infoBox.innerText.trim();
+        }
+    });
+}
+
+// Call after updating camp interface or loading schedule
+function syncInfoBoxAfterUIUpdate() {
+    setTimeout(updateInfoBoxForSelectedCamp, 0);
+}
+
+// Patch updateCampInterface and restoreSchedule to sync info box
+const originalUpdateCampInterface = updateCampInterface;
+updateCampInterface = function() {
+    originalUpdateCampInterface.apply(this, arguments);
+    syncInfoBoxAfterUIUpdate();
+};
+
+const originalRestoreSchedule = restoreSchedule;
+restoreSchedule = function(data) {
+    originalRestoreSchedule.apply(this, arguments);
+    syncInfoBoxAfterUIUpdate();
+};
 
 campSelector.addEventListener('change', () => {
     const selectedCamp = campSelector.value;
@@ -545,13 +683,20 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
     } else {
         cellActivity.style.background = '';
         cellActivity.style.color = '';
+        // Allow click-to-select for empty cells
+        cellActivity.style.cursor = 'pointer';
+        cellActivity.onclick = (e) => {
+            // Deselect previous
+            clearSelectedCell();
+            // Select this cell
+            cellActivity.classList.add('selected-activity-cell');
+            selectedCellInfo = { groupIndex, activityIndex, cellElement: cellActivity };
+            // Optionally, scroll palette into view for accessibility
+            document.getElementById('activity-palette').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
     }
     // Always make droppable
     makeActivityCellsDroppable();
-
-    // Remove details popup on click
-    cellActivity.style.cursor = '';
-    cellActivity.onclick = null;
 
     // Add delete icon
     const deleteActivityIcon = document.createElement('i');
@@ -803,13 +948,20 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
     } else {
         cellActivity.style.background = '';
         cellActivity.style.color = '';
+        // Allow click-to-select for empty cells
+        cellActivity.style.cursor = 'pointer';
+        cellActivity.onclick = (e) => {
+            // Deselect previous
+            clearSelectedCell();
+            // Select this cell
+            cellActivity.classList.add('selected-activity-cell');
+            selectedCellInfo = { groupIndex, activityIndex, cellElement: cellActivity };
+            // Optionally, scroll palette into view for accessibility
+            document.getElementById('activity-palette').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
     }
     // Always make droppable
     makeActivityCellsDroppable();
-
-    // Remove details popup on click
-    cellActivity.style.cursor = '';
-    cellActivity.onclick = null;
 
     // Add delete icon
     const deleteActivityIcon = document.createElement('i');
@@ -934,12 +1086,6 @@ function editCampName(oldCampName) {
         }
         loadGroupsForCamp(trimmedNewName);
 
-        // Update the Edit Camp button's event listener
-        const editButton = document.getElementById('edit-camp-button');
-        if (editButton) {
-            editButton.onclick = () => editCampName(trimmedNewName);
-        }
-
         showAlert(`Camp name updated to "${trimmedNewName}" successfully.`);
     });
 }
@@ -956,17 +1102,14 @@ if (campDropdown) {
         const selectedCamp = campDropdown.value;
 
         if (selectedCamp) {
-            if (!editButton) {
-                editButton = document.createElement('button');
-                editButton.id = 'edit-camp-button';
+            if (editButton) {
+                editButton.style.display = 'inline-block';
                 editButton.textContent = 'Edit Camp';
-                editButton.addEventListener('click', () => editCampName(selectedCamp));
-                currentCampContainer.appendChild(editButton); // Place beside current camp heading
-            } else {
                 editButton.onclick = () => editCampName(selectedCamp);
+                currentCampContainer.appendChild(editButton); // Place beside current camp heading
             }
         } else if (editButton) {
-            editButton.remove();
+            editButton.style.display = 'none';
         }
     });
 }
