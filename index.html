@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camp Scheduler</title>    
+    <link rel="stylesheet" href="styles.css">
+    <!-- Add Font Awesome for icons -->
+    <!-- jsPDF Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- jspdf-autotable plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <!-- SweetAlert2 Library -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <header>
+        <h1>Camp Scheduler</h1>
+    </header>
+    <main>
+        <aside id="menu">
+            <button id="add-camp-button">Add Camp</button>
+            <button id="add-global-activity-button">Add Activity</button>
+            <button id="add-group-button">Add Group</button>
+            <button id="export-camp-button">Export Camp</button>
+        </aside>
+
+        <!-- Main content area for the scheduler -->
+        <div id="scheduler-area">
+            <h2 id="current-camp">Camp Scheduler</h2> <!-- This will be updated by script.js -->
+
+            <!-- Camp selection display -->
+            <div id="camp-display" style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem; display: flex; justify-content: center; align-items: center;">
+                <span style="padding-left: 1rem;">No camps available</span>
+                <select id="camp-selector" style="display: none;">
+                    <!-- Camp options will be dynamically added here -->
+                </select>
+            </div>
+
+            <!-- Container for group schedule boxes -->
+            <div id="group-box">
+                <div class="group" id="group-1"> <!-- Example group, script.js adds more -->
+                    <div class="group-header">
+                        <span>Group 1</span>
+                        <i class="fas fa-undo action-icon" title="Undo"></i>
+                        <i class="fas fa-trash action-icon" title="Delete"></i>
+                        <i class="fas fa-plus action-icon" title="Add"></i>
+                    </div>
+                    <table class="group-table">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Activity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Rows will be dynamically added here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Camp Information Section -->
+            <div id="camp-info-section" style="margin-top: 2rem;">
+                <h3>Camp Information</h3>
+                <select id="camp-dropdown" style="display: block; margin-bottom: 10px; min-width: 200px; padding: 5px;">
+                    <!-- Camp options will be dynamically added here by script.js -->
+                </select>
+                <div id="info-box" contenteditable="true" style="border: 1px solid #ccc; padding: 10px; min-height: 100px; background-color: #fff;">
+                    Click here to add information about the selected camp.
+                </div>
+            </div>
+        </div>
+
+        <!-- Optional Drop Area Feature (hidden by default) -->
+        <section id="drop-area" style="display: none;">
+            <h2>Drop Area Feature</h2>
+            <div id="drop-box">
+                <!-- Items can be dragged and dropped here -->
+            </div>
+        </section>
+    </main>
+    <script src="script.js"></script>
+</body>
+</html>

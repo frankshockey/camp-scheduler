@@ -1,0 +1,337 @@
+/* styles.css */
+
+/* Reset styles to start from scratch */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+header {
+    background-color: #004080;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+}
+
+/* Reverting layout changes */
+main {
+    display: flex;
+    flex-direction: column; /* Revert to vertical layout */
+    padding: 20px; /* Added padding around the main content */
+    height: auto;
+}
+
+#menu {
+    width: 100%;
+    background-color: #004080; /* Dark blue */
+    color: white;
+    display: block;
+    padding: 1rem;
+    overflow-y: visible; /* Remove scroll for menu */
+}
+
+#menu button {
+    background-color: #0059b3; /* Lighter blue */
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    margin: 0.5rem auto; /* Center buttons horizontally */
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    width: 250px; /* Set button width to 250px */
+}
+
+#menu button:hover {
+    background-color: #003366; /* Darker blue */
+}
+
+#content {
+    flex: none;
+    max-width: none; /* Remove content width constraint */
+    padding: 1rem;
+    background-color: transparent; /* Remove background color */
+    display: block; /* Revert to block layout */
+    margin-left: 0; /* Remove spacing between menu and content */
+}
+
+/* Remove the dotted box styles */
+#drop-area {
+    display: none;
+}
+
+/* Update the grey box for groups */
+#drop-box {
+    width: 100%;
+    max-width: 800px; /* Constrain width for better readability */
+    height: 300px; /* Adjusted height for groups */
+    background-color: #f9f9f9; /* Light grey background */
+    border: 2px solid #ccc; /* Light grey border */
+    border-radius: 10px; /* Rounded corners */
+    padding: 1rem; /* Add padding for content */
+    margin-top: 1rem; /* Add spacing below the camp name */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    overflow-y: auto; /* Enable scrolling if content overflows */
+}
+
+/* Revert camp name and dropdown alignment */
+#camp-header {
+    display: block;
+    text-align: center; /* Center align camp name and dropdown */
+    margin-bottom: 0; /* Remove spacing below the header */
+}
+
+#camp-name {
+    font-size: 1rem;
+    font-weight: normal;
+}
+
+/* Style for the camp dropdown and edit button container */
+#camp-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* Style for the camp dropdown */
+#camp-dropdown {
+    padding: 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+/* Style for the edit camp button */
+#edit-camp-button {
+    padding: 8px 12px;
+    font-size: 14px;
+    color: #fff;
+    background-color: #007bff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+#edit-camp-button:hover {
+    background-color: #0056b3;
+}
+
+/* Add styles for the Info Box */
+#info-box {
+    width: 100%;
+    max-width: 800px; /* Constrain width for better readability */
+    height: 200px; /* Set a fixed height */
+    background-color: #ffffff; /* White background */
+    border: 2px solid #ccc; /* Light grey border */
+    border-radius: 10px; /* Rounded corners */
+    padding: 1rem; /* Add padding for content */
+    padding-left: 2rem; /* Add extra padding on the left side */
+    margin-top: 1rem; /* Add spacing below the schedule area */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    overflow-y: auto; /* Enable scrolling if content overflows */
+    margin-left: 2rem; /* Add spacing to the left of the box */
+}
+
+/* Add styles for the Group Box */
+#group-box {
+    display: flex; /* Enable flexbox for horizontal layout */
+    flex-wrap: wrap; /* Allow groups to wrap to the next line */
+    gap: 20px; /* Space between group boxes */
+    align-items: flex-start; /* Align items to the start of the cross axis */
+    padding: 1rem; /* Keep padding */
+    margin-bottom: 1rem; /* Keep spacing above Info Box */
+}
+/* Individual group boxes will now handle their own styling and layout within this flex container */
+/* Style for the Group Box header */
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.undo-icon {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+/* Style for individual Group Boxes */
+.group {
+    border: 2px solid #ccc; /* Light grey border */
+    border-radius: 10px; /* Rounded corners */
+    background-color: #ffffff; /* White background */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for depth */
+    flex-grow: 0; /* Prevent the group box from growing unnecessarily */
+    flex-shrink: 1; /* Allow it to shrink if needed */
+    flex-basis: 260px; /* Set a base width slightly larger than the table content */
+    min-width: 240px; /* Prevent groups from becoming too narrow */
+    /* max-width: 500px; is still fine, but less impactful with flex-grow: 0 */
+    overflow: hidden; /* Hide overflow content within the group box */
+}
+
+/* Drag-and-drop styles */
+.group {
+    border: 1px dashed #ccc;
+    padding: 10px;
+    margin: 10px 0;
+    background-color: #f9f9f9;
+    cursor: grab;
+}
+.group:active {
+    cursor: grabbing;
+    opacity: 0.8;
+}
+
+/* Style for the Group Table */
+.group-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+}
+
+.group-table th, .group-table td {
+    border: 1px solid #ccc;
+    padding: 0.5rem;
+    text-align: center;
+}
+
+.group-table td[contenteditable="true"] {
+    background-color: #fff;
+    outline: none;
+}
+
+/* Adjust the width for the Time column */
+.group-table th:first-child, .group-table td:first-child {
+    width: 75px; /* Set width for the Time column */
+    max-width: 75px; /* Ensure it doesn't exceed 75px */
+    padding: 0.25rem; /* Reduce padding */
+}
+
+/* Adjust the maximum width for the Activity column */
+.group-table th:nth-child(2), .group-table td:nth-child(2) {
+    width: 125px; /* Set width for the Activity column */
+    max-width: 125px; /* Ensure it doesn't exceed 125px */
+    /* Text will wrap if it's too long for this width */
+}
+
+/* Style for table headers */
+.group-table th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+}
+/* Style for action icons (undo, delete, add) */
+.action-icon {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    margin-left: 0.5rem; /* Add spacing between icons */
+}
+
+/* Style for the time dropdown */
+.time-dropdown {
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: 100%; /* Make dropdown fill cell */
+    box-sizing: border-box; /* Include padding and border in element's total width and height */
+    font-size: 0.9em;
+    text-align: center; /* Center text in dropdown if desired */
+}
+
+/* Style for the activity dropdown */
+.activity-dropdown {
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    width: calc(100% - 30px); /* Make dropdown fill most of the cell, leaving space for icon */
+    box-sizing: border-box;
+    font-size: 0.9em;
+    margin-right: 5px; /* Space between dropdown and delete icon */
+}
+
+
+/* Adjust the delete icon beside each row */
+.group-table td .fa-trash, .group-table td .fa-times { /* Combined for consistency */
+    margin-left: 0.5rem; /* Add spacing */
+    cursor: pointer; /* Make it clickable */
+    color: #d9534f; /* Red color for delete icon */
+}
+.group-table td .fa-times:hover {
+    color: #c9302c;
+}
+
+
+/* Remove unnecessary width for the Actions column if it exists (last-child might not always be actions) */
+/* This rule might be too broad if your last column isn't always an action icon column */
+.group-table td:last-child {
+    /* width: auto; */ /* Let the content (icon or dropdown) fit naturally if it's the last cell */
+    text-align: center; /* Center align the content */
+}
+
+/* Modal dialog styles (SweetAlert2) */
+.swal2-popup {
+    font-size: 1.2rem;
+}
+
+/* Color coding */
+[data-camp] {
+    border-radius: 5px;
+    padding: 5px;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* Animations */
+.animated {
+    animation-duration: 0.5s;
+    animation-fill-mode: both;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.fadeIn {
+    animation-name: fadeIn;
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+.fadeOut {
+    animation-name: fadeOut;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .group {
+        font-size: 0.9rem;
+        padding: 8px;
+    }
+
+    #group-box {
+        flex-direction: column;
+    }
+}
