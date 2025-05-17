@@ -1,3 +1,12 @@
+// Remove duplicate 'Add Group' buttons if they exist (MUST be first)
+const allAddGroupButtons = document.querySelectorAll('#add-group-button');
+if (allAddGroupButtons.length > 1) {
+    for (let i = 1; i < allAddGroupButtons.length; i++) {
+        allAddGroupButtons[i].parentElement.removeChild(allAddGroupButtons[i]);
+    }
+}
+
+console.log('SCRIPT LOADED');
 console.log('Camp Scheduler initialized.');
 
 const groupContainer = document.getElementById('group-box');
@@ -66,6 +75,7 @@ addCampButton.addEventListener('click', () => {
         updateCampInterface();
         campSelector.value = campName;
         loadGroupsForCamp(campName);
+        // Removed auto-save here
     });
 });
 
@@ -79,6 +89,7 @@ if (addGlobalActivityButton) {
             }
             availableActivities.push({ name: trimmedName, color: selectedColor });
             renderActivityPalette();
+            // Removed auto-save here
         });
     });
 }
@@ -457,6 +468,14 @@ if (exportCampButton) {
     });
 }
 
+// Utility: Ensure Y position does not overflow PDF page, add new page if needed
+function checkPageOverflow(doc, currentY, pageHeight, pageMargin) {
+    if (currentY > pageHeight - pageMargin) {
+        doc.addPage();
+        return pageMargin;
+    }
+    return currentY;
+}
 
 function updateCampInterface() {
     const previouslySelectedCamp = campSelector.value;
@@ -573,6 +592,33 @@ function syncInfoBoxAfterUIUpdate() {
     setTimeout(updateInfoBoxForSelectedCamp, 0);
 }
 
+// --- Restore schedule from data object ---
+function restoreSchedule(data) {
+    if (!data) return;
+    // Defensive: Only assign if structure matches
+    if (Array.isArray(data.camps)) camps.length = 0, camps.push(...data.camps);
+    if (typeof data.campGroups === 'object') {
+        Object.keys(campGroups).forEach(k => delete campGroups[k]);
+        Object.assign(campGroups, data.campGroups);
+    }
+    if (typeof data.campInfo === 'object') {
+        Object.keys(campInfo).forEach(k => delete campInfo[k]);
+        Object.assign(campInfo, data.campInfo);
+    }
+    if (Array.isArray(data.availableActivities)) {
+        availableActivities.length = 0;
+        availableActivities.push(...data.availableActivities);
+    }
+    updateCampInterface();
+    if (camps.length > 0) {
+        campSelector.value = camps[0];
+        loadGroupsForCamp(camps[0]);
+    } else {
+        loadGroupsForCamp(null);
+    }
+    renderActivityPalette();
+}
+
 // Patch updateCampInterface and restoreSchedule to sync info box
 const originalUpdateCampInterface = updateCampInterface;
 updateCampInterface = function() {
@@ -582,14 +628,82 @@ updateCampInterface = function() {
 
 const originalRestoreSchedule = restoreSchedule;
 restoreSchedule = function(data) {
-    originalRestoreSchedule.apply(this, arguments);
-    syncInfoBoxAfterUIUpdate();
+    originalRestoreSchedule(data);
+
+    // (If you want to add extra logic after restore, do it here)
 };
+
+// Firestore Cloud Sync ---
+// Use window.firebaseDb (set in index.html)
+// Firestore document path for all schedule data (single-user, single-camp)
+const FIRESTORE_DOC_PATH = 'schedules/main';
+
+async function saveScheduleToFirestore() {
+    const firestoreDb = window.firebaseDb;
+    if (!firestoreDb) {
+        showAlert('Firestore is NOT connected (window.firebaseDb is missing). Check your Firebase config and script order.');
+        console.error('Firestore is NOT connected (window.firebaseDb is missing).');
+        return;
+    }
+    showAlert('Attempting to save to Firestore...');
+    console.log('[DEBUG] saveScheduleToFirestore called. Data:', { camps, campGroups, campInfo, availableActivities });
+    const data = {
+        camps,
+        campGroups,
+        campInfo,
+        availableActivities
+    };
+    try {
+        await firestoreDb.collection('schedules').doc('main').set(data);
+        showAlert('Schedule saved to the cloud (Firestore).');
+        console.log('[DEBUG] Firestore save successful.');
+    } catch (err) {
+        showAlert('Failed to save to Firestore: ' + err.message);
+        console.error('[DEBUG] Firestore save error:', err);
+    }
+}
+
+async function loadScheduleFromFirestore() {
+    const firestoreDb = window.firebaseDb;
+    if (!firestoreDb) {
+        showAlert('Firestore is NOT connected (window.firebaseDb is missing). Check your Firebase config and script order.');
+        console.error('Firestore is NOT connected (window.firebaseDb is missing).');
+        return;
+    }
+    showAlert('Attempting to load from Firestore...');
+    try {
+        const docSnap = await firestoreDb.collection('schedules').doc('main').get();
+        if (docSnap.exists) {
+            restoreSchedule(docSnap.data());
+            showAlert('Schedule loaded from the cloud (Firestore).');
+            console.log('[DEBUG] Firestore load successful. Data:', docSnap.data());
+        } else {
+            showAlert('No cloud schedule found.');
+            console.warn('[DEBUG] No cloud schedule found in Firestore.');
+        }
+    } catch (err) {
+        showAlert('Failed to load from Firestore: ' + err.message);
+        console.error('[DEBUG] Firestore load error:', err);
+    }
+}
+
+// Patch Save/Load buttons to use Firestore
+if (saveScheduleButton) {
+    saveScheduleButton.addEventListener('click', async () => {
+        await saveScheduleToFirestore();
+    });
+}
+if (loadScheduleButton) {
+    loadScheduleButton.addEventListener('click', async () => {
+        await loadScheduleFromFirestore();
+    });
+}
 
 campSelector.addEventListener('change', () => {
     const selectedCamp = campSelector.value;
     currentCampHeading.textContent = `Current Camp: ${selectedCamp}`;
     loadGroupsForCamp(selectedCamp);
+    updateInfoBoxForSelectedCamp(); // Ensure camp info updates automatically
 });
 
 function loadGroupsForCamp(campName) {
@@ -841,371 +955,163 @@ function showAlert(message) {
     });
 }
 
-addGroupButton.addEventListener('click', () => {
-    const selectedCamp = campSelector.value;
-    if (!selectedCamp) {
-        showAlert('Please select a camp first before adding a group.');
-        return;
-    }
-    showModalInput('Enter Group Name:', (groupName) => {
-        if (!campGroups[selectedCamp]) {
-            campGroups[selectedCamp] = [];
+// --- DEBUGGING: Add Group Button Diagnostics ---
+console.log('[DEBUG] Script loaded. addGroupButton:', addGroupButton);
+if (!addGroupButton) {
+    console.error('[DEBUG] addGroupButton is null at script load.');
+} else {
+    console.log('[DEBUG] addGroupButton exists at script load.');
+}
+
+// MutationObserver to re-attach handler if button is replaced
+const observeAddGroupButton = () => {
+    const parent = document.body;
+    const observer = new MutationObserver(() => {
+        const btn = document.getElementById('add-group-button');
+        if (btn && !btn._handlerAttached) {
+            console.log('[DEBUG] addGroupButton found by MutationObserver, re-attaching handler.');
+            btn.onclick = async () => {
+                const selectedCamp = campSelector.value;
+                if (!selectedCamp) {
+                    showAlert('Please select a camp first before adding a group.');
+                    return;
+                }
+                showModalInput('Enter Group Name:', async (groupName) => {
+                    if (!campGroups[selectedCamp]) {
+                        campGroups[selectedCamp] = [];
+                    }
+                    if (campGroups[selectedCamp].some(group => group.name === groupName)) {
+                        showAlert(`A group named "${groupName}" already exists in camp "${selectedCamp}".`);
+                        return;
+                    }
+                    campGroups[selectedCamp].push({ name: groupName, activities: [] });
+                    loadGroupsForCamp(selectedCamp);
+                    // Removed auto-save here
+                });
+            };
+            btn._handlerAttached = true;
         }
-        if (campGroups[selectedCamp].some(group => group.name === groupName)) {
-            showAlert(`A group named "${groupName}" already exists in camp "${selectedCamp}".`);
+    });
+    observer.observe(parent, { childList: true, subtree: true });
+};
+observeAddGroupButton();
+
+// Edit camp name (rename camp)
+function editCampName(oldName) {
+    showModalInput('Edit Camp Name:', (newName) => {
+        if (!newName || newName === oldName) return;
+        if (camps.includes(newName)) {
+            showAlert(`A camp named "${newName}" already exists.`);
             return;
         }
-        campGroups[selectedCamp].push({ name: groupName, activities: [] });
-        loadGroupsForCamp(selectedCamp);
+        // Update camps array
+        const idx = camps.indexOf(oldName);
+        if (idx !== -1) camps[idx] = newName;
+        // Update campGroups
+        if (campGroups[oldName]) {
+            campGroups[newName] = campGroups[oldName];
+            delete campGroups[oldName];
+        }
+        // Update campInfo
+        if (campInfo[oldName]) {
+            campInfo[newName] = campInfo[oldName];
+            delete campInfo[oldName];
+        }
+        // Update UI
+        updateCampInterface();
+        campSelector.value = newName;
+        loadGroupsForCamp(newName);
+        // Removed auto-save here
     });
-});
+}
 
-// Add drag-and-drop functionality for groups and activities
-groupContainer.addEventListener('dragstart', (e) => {
-    if (e.target.classList.contains('group')) {
-        e.dataTransfer.setData('text/plain', e.target.id);
-    }
-});
+// Utility: Create a time selector input for activity rows
+function createCustomTimeSelector(value) {
+    const input = document.createElement('input');
+    input.type = 'time';
+    input.value = value || '09:00';
+    input.style.width = '80px';
+    input.style.fontSize = '14px';
+    input.style.padding = '2px 4px';
+    input.style.border = '1px solid #ccc';
+    input.style.borderRadius = '4px';
+    return input;
+}
 
-groupContainer.addEventListener('dragover', (e) => {
-    e.preventDefault();
-});
-
-groupContainer.addEventListener('drop', (e) => {
-    e.preventDefault();
-    const draggedId = e.dataTransfer.getData('text/plain');
-    const draggedElement = document.getElementById(draggedId);
-    const dropTarget = e.target.closest('.group');
-    if (draggedElement && dropTarget && draggedElement !== dropTarget) {
-        groupContainer.insertBefore(draggedElement, dropTarget.nextSibling);
-    }
-});
-
-// Enable drag-to-reorder for activity rows within a group table
+// Utility: Stub for activity row reordering (no-op)
 function enableActivityRowReordering(tableBody, campName, groupIndex) {
-    let dragSrcRow = null;
-    tableBody.querySelectorAll('tr').forEach((row, idx) => {
-        row.setAttribute('draggable', 'true');
-        row.addEventListener('dragstart', function (e) {
-            dragSrcRow = row;
+    if (!tableBody) return;
+    // Remove any previous drag event listeners to avoid duplicates
+    Array.from(tableBody.rows).forEach(row => {
+        row.draggable = true;
+        row.ondragstart = null;
+        row.ondragover = null;
+        row.ondrop = null;
+        row.ondragenter = null;
+        row.ondragleave = null;
+    });
+    let dragSrcIdx = null;
+    Array.from(tableBody.rows).forEach((row, idx) => {
+        row.draggable = true;
+        row.ondragstart = (e) => {
+            dragSrcIdx = idx;
             row.classList.add('dragging-row');
             e.dataTransfer.effectAllowed = 'move';
-        });
-        row.addEventListener('dragend', function () {
+        };
+        row.ondragover = (e) => {
+            e.preventDefault();
+            row.classList.add('drag-over-row');
+        };
+        row.ondragleave = (e) => {
+            row.classList.remove('drag-over-row');
+        };
+        row.ondrop = (e) => {
+            e.preventDefault();
+            row.classList.remove('drag-over-row');
+            const dragDestIdx = idx;
+            if (dragSrcIdx === null || dragDestIdx === null || dragSrcIdx === dragDestIdx) return;
+            // Move activity in data model
+            const activities = campGroups[campName][groupIndex].activities;
+            const [moved] = activities.splice(dragSrcIdx, 1);
+            activities.splice(dragDestIdx, 0, moved);
+            loadGroupsForCamp(campName);
+        };
+        row.ondragend = (e) => {
             row.classList.remove('dragging-row');
-            dragSrcRow = null;
-        });
-        row.addEventListener('dragover', function (e) {
-            e.preventDefault();
-            if (row !== dragSrcRow) row.classList.add('drag-over-row');
-        });
-        row.addEventListener('dragleave', function () {
-            row.classList.remove('drag-over-row');
-        });
-        row.addEventListener('drop', function (e) {
-            e.preventDefault();
-            row.classList.remove('drag-over-row');
-            if (dragSrcRow && dragSrcRow !== row) {
-                // Find indices
-                const rows = Array.from(tableBody.querySelectorAll('tr'));
-                const fromIdx = rows.indexOf(dragSrcRow);
-                const toIdx = rows.indexOf(row);
-                // Update data model
-                const group = campGroups[campName][groupIndex];
-                if (group && group.activities) {
-                    const [moved] = group.activities.splice(fromIdx, 1);
-                    group.activities.splice(toIdx, 0, moved);
-                }
-                // Re-render table
-                while (tableBody.firstChild) tableBody.removeChild(tableBody.firstChild);
-                group.activities.forEach((activity, activityIndex) => {
-                    addActivityToTable(activity, tableBody, campName, groupIndex, activityIndex);
-                });
-            }
-        });
-    });
-}
-
-// Patch addActivityToTable to call enableActivityRowReordering after adding a row
-function addActivityToTable(activity, tableBody, campName, groupIndex, activityIndex) {
-    const row = tableBody.insertRow();
-
-    const cellTime = row.insertCell();
-    const timeSelector = createCustomTimeSelector(activity.time);
-    timeSelector.addEventListener('change', (e) => {
-        if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
-            campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
-        }
-    });
-    cellTime.appendChild(timeSelector);
-
-    const cellActivity = row.insertCell();
-    cellActivity.textContent = activity.name || '';
-    if (activity.name) {
-        const bg = getActivityColor(activity.name);
-        cellActivity.style.background = bg;
-        cellActivity.style.color = isColorDark(bg) ? '#fff' : '#222';
-    } else {
-        cellActivity.style.background = '';
-        cellActivity.style.color = '';
-        // Allow click-to-select for empty cells
-        cellActivity.style.cursor = 'pointer';
-        cellActivity.onclick = (e) => {
-            // Deselect previous
-            clearSelectedCell();
-            // Select this cell
-            cellActivity.classList.add('selected-activity-cell');
-            selectedCellInfo = { groupIndex, activityIndex, cellElement: cellActivity };
-            // Optionally, scroll palette into view for accessibility
-            document.getElementById('activity-palette').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            dragSrcIdx = null;
         };
-    }
-    // Always make droppable
-    makeActivityCellsDroppable();
-
-    // Add delete icon
-    const deleteActivityIcon = document.createElement('i');
-    deleteActivityIcon.className = 'fas fa-times action-icon';
-    deleteActivityIcon.title = 'Delete Activity';
-    deleteActivityIcon.style.color = '#d9534f';
-    deleteActivityIcon.style.cursor = 'pointer';
-    deleteActivityIcon.style.marginLeft = '10px';
-    deleteActivityIcon.addEventListener('click', () => {
-        campGroups[campName][groupIndex].activities.splice(activityIndex, 1);
-        loadGroupsForCamp(campName);
-    });
-    cellActivity.appendChild(deleteActivityIcon);
-
-    setTimeout(() => enableActivityRowReordering(tableBody, campName, groupIndex), 0);
-}
-
-// Add or update activity details
-function showActivityDetailsModal(activity, onSave) {
-    Swal.fire({
-        title: activity.name ? `Details for: ${activity.name}` : 'Activity Details',
-        html:
-            `<label for="swal-activity-location" style="float:left;font-size:13px;margin-top:8px;">Location</label>` +
-            `<input id="swal-activity-location" class="swal2-input" placeholder="Location" value="${activity.location || ''}">` +
-            `<label for="swal-activity-instructor" style="float:left;font-size:13px;margin-top:8px;">Instructor</label>` +
-            `<input id="swal-activity-instructor" class="swal2-input" placeholder="Instructor" value="${activity.instructor || ''}">` +
-            `<label for="swal-activity-description" style="float:left;font-size:13px;margin-top:8px;">Description</label>` +
-            `<textarea id="swal-activity-description" class="swal2-textarea" placeholder="Description">${activity.description || ''}</textarea>`,
-        focusConfirm: false,
-        showCancelButton: true,
-        preConfirm: () => {
-            return {
-                location: document.getElementById('swal-activity-location').value.trim(),
-                instructor: document.getElementById('swal-activity-instructor').value.trim(),
-                description: document.getElementById('swal-activity-description').value.trim(),
-            };
-        }
-    }).then((result) => {
-        if (result.isConfirmed && onSave) {
-            onSave(result.value);
-        }
     });
 }
 
-function createCustomTimeSelector(selectedTimeValue) {
-    const selectElement = document.createElement('select');
-    selectElement.classList.add('time-dropdown');
-
-    const startHour = 7;
-    const endHour = 21;
-    const incrementMinutes = 10;
-
-    for (let h = startHour; h <= endHour; h++) {
-        for (let m = 0; m < 60; m += incrementMinutes) {
-            if (h === endHour && m > 0) break;
-
-            const hourString = String(h).padStart(2, '0');
-            const minuteString = String(m).padStart(2, '0');
-            const timeValue = `${hourString}:${minuteString}`;
-
-            const option = document.createElement('option');
-            option.value = timeValue;
-            option.textContent = timeValue;
-
-            if (timeValue === selectedTimeValue) {
-                option.selected = true;
-            }
-            selectElement.appendChild(option);
-        }
+// --- Saving Indicator ---
+let savingIndicator = null;
+function showSavingIndicator() {
+    if (!savingIndicator) {
+        savingIndicator = document.createElement('div');
+        savingIndicator.id = 'saving-indicator';
+        savingIndicator.style.position = 'fixed';
+        savingIndicator.style.bottom = '20px';
+        savingIndicator.style.right = '20px';
+        savingIndicator.style.background = '#007bff';
+        savingIndicator.style.color = '#fff';
+        savingIndicator.style.padding = '8px 18px';
+        savingIndicator.style.borderRadius = '6px';
+        savingIndicator.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+        savingIndicator.style.zIndex = 9999;
+        savingIndicator.style.fontSize = '16px';
+        savingIndicator.textContent = 'Saving...';
+        document.body.appendChild(savingIndicator);
     }
-    return selectElement;
+    savingIndicator.style.display = 'block';
+}
+function hideSavingIndicator() {
+    if (savingIndicator) savingIndicator.style.display = 'none';
 }
 
-console.log('End of script.js');
+// --- Debounced Auto-Save ---
+// REMOVE autoSaveToFirestore and patchAutoSave
+// --- Remove all auto-save triggers ---
+// (No-op: all auto-save logic removed)
 
-function checkPageOverflow(doc, currentY, pageHeight, pageMargin) {
-    // Check if the current Y position exceeds the page height minus the margin
-    if (currentY > pageHeight - pageMargin) {
-        doc.addPage(); // Add a new page
-        return pageMargin; // Reset Y position to the top margin of the new page
-    }
-    return currentY; // Return the current Y position if no overflow
-}
-
-function editCampName(oldCampName) {
-    showModalInput(`Edit Camp Name (Current: ${oldCampName}):`, (newCampName) => {
-        const trimmedNewName = newCampName.trim();
-
-        if (!trimmedNewName || trimmedNewName === oldCampName) {
-            showAlert('No changes made to the camp name.');
-            return;
-        }
-
-        if (camps.includes(trimmedNewName)) {
-            showAlert(`A camp with the name "${trimmedNewName}" already exists.`);
-            return;
-        }
-
-        // Update camp name in all relevant data structures
-        const campIndex = camps.indexOf(oldCampName);
-        if (campIndex !== -1) {
-            camps[campIndex] = trimmedNewName;
-        }
-
-        if (campGroups[oldCampName]) {
-            campGroups[trimmedNewName] = campGroups[oldCampName];
-            delete campGroups[oldCampName];
-        }
-
-        if (campInfo[oldCampName]) {
-            campInfo[trimmedNewName] = campInfo[oldCampName];
-            delete campInfo[oldCampName];
-        }
-
-        // Refresh the UI to reflect the updated camp name
-        updateCampInterface();
-        if (campSelector.value === oldCampName) {
-            campSelector.value = trimmedNewName;
-        }
-        if (campDropdown.value === oldCampName) {
-            campDropdown.value = trimmedNewName;
-        }
-        loadGroupsForCamp(trimmedNewName);
-
-        showAlert(`Camp name updated to "${trimmedNewName}" successfully.`);
-    });
-}
-
-// Wrap the camp dropdown and edit button in a container for better layout
-if (campDropdown) {
-    const campControlsContainer = document.getElementById('camp-controls');
-
-    // Move the Edit Camp button beside the current camp heading
-    const currentCampContainer = currentCampHeading.parentElement;
-    let editButton = document.getElementById('edit-camp-button');
-
-    campDropdown.addEventListener('change', () => {
-        const selectedCamp = campDropdown.value;
-
-        if (selectedCamp) {
-            if (editButton) {
-                editButton.style.display = 'inline-block';
-                editButton.textContent = 'Edit Camp';
-                editButton.onclick = () => editCampName(selectedCamp);
-                currentCampContainer.appendChild(editButton); // Place beside current camp heading
-            }
-        } else if (editButton) {
-            editButton.style.display = 'none';
-        }
-    });
-}
-
-// Save schedule to localStorage and offer JSON download
-if (saveScheduleButton) {
-    saveScheduleButton.addEventListener('click', () => {
-        const data = {
-            camps,
-            campGroups,
-            campInfo,
-            availableActivities
-        };
-        // Save to localStorage
-        localStorage.setItem('campSchedulerData', JSON.stringify(data));
-        // Offer download as JSON
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'camp-schedule-backup.json';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showAlert('Schedule saved to local storage and downloaded as JSON.');
-    });
-}
-
-// Load schedule from localStorage or JSON file
-if (loadScheduleButton) {
-    loadScheduleButton.addEventListener('click', () => {
-        Swal.fire({
-            title: 'Load Schedule',
-            html: '<button id="load-from-local" class="swal2-confirm swal2-styled" style="margin:5px;">From Local Storage</button>' +
-                  '<input type="file" id="load-from-file" accept="application/json" style="margin:5px;">',
-            showCancelButton: true,
-            showConfirmButton: false,
-            didOpen: () => {
-                document.getElementById('load-from-local').onclick = () => {
-                    const data = localStorage.getItem('campSchedulerData');
-                    if (data) {
-                        try {
-                            restoreSchedule(JSON.parse(data));
-                            Swal.close();
-                            showAlert('Schedule loaded from local storage.');
-                        } catch (e) {
-                            showAlert('Failed to load schedule from local storage.');
-                        }
-                    } else {
-                        showAlert('No saved schedule found in local storage.');
-                    }
-                };
-                document.getElementById('load-from-file').onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (evt) => {
-                        try {
-                            const data = JSON.parse(evt.target.result);
-                            restoreSchedule(data);
-                            Swal.close();
-                            showAlert('Schedule loaded from file.');
-                        } catch (err) {
-                            showAlert('Invalid JSON file.');
-                        }
-                    };
-                    reader.readAsText(file);
-                };
-            }
-        });
-    });
-}
-
-function restoreSchedule(data) {
-    if (!data) return;
-    // Defensive: Only assign if structure matches
-    if (Array.isArray(data.camps)) camps.length = 0, camps.push(...data.camps);
-    if (typeof data.campGroups === 'object') {
-        Object.keys(campGroups).forEach(k => delete campGroups[k]);
-        Object.assign(campGroups, data.campGroups);
-    }
-    if (typeof data.campInfo === 'object') {
-        Object.keys(campInfo).forEach(k => delete campInfo[k]);
-        Object.assign(campInfo, data.campInfo);
-    }
-    if (Array.isArray(data.availableActivities)) {
-        availableActivities.length = 0;
-        availableActivities.push(...data.availableActivities);
-    }
-    updateCampInterface();
-    if (camps.length > 0) {
-        campSelector.value = camps[0];
-        loadGroupsForCamp(camps[0]);
-    } else {
-        loadGroupsForCamp(null);
-    }
-    renderActivityPalette();
-}
+// Patch all mutating actions to auto-save
+// REMOVE patchAutoSave();

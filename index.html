@@ -61,6 +61,33 @@
             </div>
         </div>
     </main>
+    <!-- Firebase App (the core SDK) compat version -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <!-- Firestore SDK compat version -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script>
+      console.log('[DEBUG] window.firebase right after CDN scripts:', window.firebase);
+    </script>
+    <script>
+      if (typeof firebase === 'undefined') {
+        document.body.innerHTML = '<div style="color:red;font-size:1.2em;padding:2em;">FATAL: Firebase SDK failed to load. Check your internet connection and script order.</div>' + document.body.innerHTML;
+        throw new Error('Firebase SDK not loaded');
+      }
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyAXURNmxzBTyxb8iR_g6SeYE7a0uHMWnt4",
+        authDomain: "camp-scheduler-a683c.firebaseapp.com",
+        projectId: "camp-scheduler-a683c",
+        storageBucket: "camp-scheduler-a683c.appspot.com",
+        messagingSenderId: "874072112945",
+        appId: "1:874072112945:web:6a2c1af8d038c090ae3a10"
+      };
+      // Initialize Firebase
+      const app = firebase.initializeApp(firebaseConfig);
+      // Initialize Firestore
+      window.firebaseDb = firebase.firestore(app);
+      console.log('[FIREBASE INIT] window.firebaseDb:', window.firebaseDb);
+    </script>
     <script src="script.js"></script>
-</body>
+  </body>
 </html>
