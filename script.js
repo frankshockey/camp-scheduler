@@ -50,18 +50,63 @@ function getActivityColor(activityName) {
     return found ? found.color : fixedActivityPalette[0];
 }
 
-// Utility: createCustomTimeSelector (native <input type="time"> only)
-function createCustomTimeSelector(timeValue) {
-    const input = document.createElement('input');
-    input.type = 'time';
-    input.className = 'activity-time-input';
-    input.value = timeValue || '09:00';
-    input.style.width = '80px';
-    input.style.fontSize = '15px';
-    input.style.padding = '2px 4px';
-    input.style.borderRadius = '4px';
-    input.style.border = '1px solid #ccc';
-    return input;
+// Utility: createCustomTimeSelector (custom scrollable time picker with SweetAlert2)
+function createCustomTimeSelector(timeValue, onTimeChange) {
+    // Create a clickable div styled as a time input
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'activity-time-picker';
+    timeDiv.tabIndex = 0;
+    timeDiv.style.width = '80px';
+    timeDiv.style.fontSize = '15px';
+    timeDiv.style.padding = '2px 4px';
+    timeDiv.style.borderRadius = '4px';
+    timeDiv.style.border = '1px solid #ccc';
+    timeDiv.style.background = '#fff';
+    timeDiv.style.cursor = 'pointer';
+    timeDiv.style.textAlign = 'center';
+    timeDiv.textContent = timeValue || '09:00';
+
+    timeDiv.addEventListener('click', () => {
+        showScrollableTimePicker(timeDiv.textContent, (newTime) => {
+            timeDiv.textContent = newTime;
+            if (typeof onTimeChange === 'function') onTimeChange(newTime);
+        });
+    });
+    return timeDiv;
+}
+
+// Custom scrollable time picker modal (SweetAlert2)
+function showScrollableTimePicker(currentValue, callback) {
+    // Generate time options in 5-min increments from 06:00 to 22:00
+    const times = [];
+    for (let h = 6; h <= 22; h++) {
+        for (let m = 0; m < 60; m += 5) {
+            const hh = h.toString().padStart(2, '0');
+            const mm = m.toString().padStart(2, '0');
+            times.push(`${hh}:${mm}`);
+        }
+    }
+    let html = '<div style="max-height:260px;overflow-y:auto;text-align:left;">';
+    times.forEach(t => {
+        html += `<div class='swal-time-option' data-time='${t}' style='padding:7px 0 7px 10px;cursor:pointer;${t===currentValue?"background:#e9ecef;font-weight:bold;":''}'>${t}</div>`;
+    });
+    html += '</div>';
+    Swal.fire({
+        title: 'Pick a time',
+        html,
+        showCancelButton: true,
+        showConfirmButton: false,
+        width: 220,
+        didOpen: () => {
+            document.querySelectorAll('.swal-time-option').forEach(opt => {
+                opt.addEventListener('click', function() {
+                    const t = this.getAttribute('data-time');
+                    Swal.close();
+                    if (typeof callback === 'function') callback(t);
+                });
+            });
+        }
+    });
 }
 
 function defineFixedActivityPalette() {
@@ -384,19 +429,17 @@ function showEditActivitiesModal() {
     });
 }
 
-// Patch addActivityToTable to allow selecting empty cells
+// Patch addActivityToTable to use the new time picker
 function addActivityToTable(activity, tableBody, campName, groupIndex, activityIndex) {
     const row = tableBody.insertRow();
 
     const cellTime = row.insertCell();
-    const timeSelector = createCustomTimeSelector(activity.time);
-    cellTime.appendChild(timeSelector);
-    // Only use native <input type="time">, no flatpickr
-    timeSelector.addEventListener('change', (e) => {
+    const timeSelector = createCustomTimeSelector(activity.time, (newTime) => {
         if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
-            campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
+            campGroups[campName][groupIndex].activities[activityIndex].time = newTime;
         }
     });
+    cellTime.appendChild(timeSelector);
 
     const cellActivity = row.insertCell();
     cellActivity.textContent = activity.name || '';
