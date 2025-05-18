@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Camp Scheduler</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./sweetalert2.min.css">
+  <script src="https://kit.fontawesome.com/2c36e9b7b1.js" crossorigin="anonymous"></script>
+  <!-- Firebase (add your config below) -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script>
+    // TODO: Replace with your Firebase config
+    var firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    window.firebaseDb = firebase.firestore();
+  </script>
+  <!-- SweetAlert2 -->
+  <script src="./sweetalert2.min.js"></script>
+  <!-- jsPDF and jsPDF-AutoTable -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.7.0/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1 id="current-camp">Camp Scheduler</h1>
+    <select id="camp-selector" class="apple-btn select-btn"></select>
+    <button id="edit-camp-button" class="apple-btn">Edit Camp</button>
+    <button id="add-camp-button" class="apple-btn">Add Camp</button>
+    <button id="save-schedule-button" class="apple-btn">Save to Cloud</button>
+    <button id="load-schedule-button" class="apple-btn">Load from Cloud</button>
+    <button id="export-camp-button" class="apple-btn">Export PDF</button>
+  </header>
+  <main>
+    <section id="info-section">
+      <div id="info-box" class="info-box" contenteditable="true"></div>
+    </section>
+    <section id="activity-palette-section">
+      <div id="activity-palette"></div>
+      <button id="add-global-activity-button" class="apple-btn">Add Activity</button>
+    </section>
+    <section id="group-section">
+      <div id="group-box"></div>
+      <button id="add-group-button" class="apple-btn">Add Group</button>
+    </section>
+  </main>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
