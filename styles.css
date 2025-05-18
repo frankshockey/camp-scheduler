@@ -78,12 +78,44 @@ main {
     cursor: grab;
     user-select: none;
     transition: background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .activity-palette-item:active {
     background: #b2ebf2;
     color: #004d40;
     opacity: 0.8;
+}
+
+.activity-palette-item .fa-trash-alt {
+    font-size: 1em;
+    margin-left: 6px;
+    cursor: pointer;
+    color: #d9534f;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.activity-palette-item .fa-trash-alt:hover {
+    opacity: 1;
+    color: #c9302c;
+}
+
+/* Edit (pencil) icon styles in activity palette */
+.activity-palette-item .fa-edit {
+    font-size: 1em;
+    margin-left: 6px;
+    cursor: pointer;
+    color: #007bff;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.activity-palette-item .fa-edit:hover {
+    opacity: 1;
+    color: #0056b3;
 }
 
 /* Remove drop area styles */
@@ -361,4 +393,25 @@ main {
     #group-box {
         flex-direction: column;
     }
+}
+
+input[type="time"] {
+  min-width: 90px;
+  min-height: 32px;
+  font-size: 16px;
+  padding: 4px 8px;
+  border: 1.5px solid #007bff;
+  border-radius: 5px;
+  background: #fff;
+  color: #222;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input[type="time"]:focus {
+  border-color: #0056b3;
+  box-shadow: 0 0 0 2px #b3d7ff;
+}
+input[type="time"]:hover {
+  border-color: #339cff;
 }

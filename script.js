@@ -1,3 +1,7 @@
+// OVERWRITE WARNING: This file is a direct copy of your main script.js (Camp Scheduler logic)
+// If you make changes, always edit script.js in the root, then copy to public/script.js
+// (Full Camp Scheduler logic, including all UI, time picker, PDF export, and Firebase integration)
+
 // Remove duplicate 'Add Group' buttons if they exist (MUST be first)
 const allAddGroupButtons = document.querySelectorAll('#add-group-button');
 if (allAddGroupButtons.length > 1) {
@@ -46,6 +50,20 @@ function getActivityColor(activityName) {
     return found ? found.color : fixedActivityPalette[0];
 }
 
+// Utility: createCustomTimeSelector (native <input type="time"> only)
+function createCustomTimeSelector(timeValue) {
+    const input = document.createElement('input');
+    input.type = 'time';
+    input.className = 'activity-time-input';
+    input.value = timeValue || '09:00';
+    input.style.width = '80px';
+    input.style.fontSize = '15px';
+    input.style.padding = '2px 4px';
+    input.style.borderRadius = '4px';
+    input.style.border = '1px solid #ccc';
+    return input;
+}
+
 function defineFixedActivityPalette() {
     if (typeof window.fixedActivityPalette === 'undefined') {
         window.fixedActivityPalette = [
@@ -59,6 +77,12 @@ function defineFixedActivityPalette() {
             'hsl(180, 70%, 60%)',  // Teal
             'hsl(90, 70%, 60%)',   // Lime
             'hsl(210, 70%, 60%)',  // Sky Blue
+            'hsl(15, 80%, 50%)',   // Deep Orange
+            'hsl(45, 90%, 55%)',   // Gold
+            'hsl(100, 50%, 50%)',  // Forest Green
+            'hsl(160, 60%, 55%)',  // Aqua
+            'hsl(240, 60%, 60%)',  // Indigo
+            'hsl(300, 60%, 65%)',  // Lavender
         ];
     }
 }
@@ -94,15 +118,15 @@ if (addGlobalActivityButton) {
     });
 }
 
-// Custom modal with color palette for adding activities
-function showModalInputWithColor(title, callback) {
+// Custom modal with color palette for adding/editing activities
+function showModalInputWithColor(title, callback, initialName = '', initialColor = '') {
     const paletteHtml = fixedActivityPalette.map(color =>
         `<div class="color-swatch" data-color="${color}" style="background:${color};display:inline-block;width:28px;height:28px;margin:3px;border-radius:50%;border:2px solid #fff;cursor:pointer;"></div>`
     ).join('');
     Swal.fire({
         title: title,
         html:
-            '<input id="swal-activity-name" class="swal2-input" placeholder="Activity Name">' +
+            '<input id="swal-activity-name" class="swal2-input" placeholder="Activity Name" value="' + (initialName || '') + '">' +
             '<div style="margin-top:10px;margin-bottom:5px;font-size:13px;text-align:left;">Pick a color:</div>' +
             `<div id="swal-color-palette">${paletteHtml}</div>`,
         focusConfirm: false,
@@ -128,6 +152,13 @@ function showModalInputWithColor(title, callback) {
                     this.classList.add('selected');
                 });
             });
+            // Pre-select the initial color if provided
+            if (initialColor) {
+                const initialSwatch = Array.from(document.querySelectorAll('.color-swatch')).find(swatch => swatch.getAttribute('data-color') === initialColor);
+                if (initialSwatch) {
+                    initialSwatch.classList.add('selected');
+                }
+            }
         }
     }).then((result) => {
         if (result.isConfirmed && result.value) {
@@ -148,28 +179,29 @@ function clearSelectedCell() {
 }
 
 // Patch renderActivityPalette to support click-to-assign to selected cell
+// Add delete button to each activity in the palette
 function renderActivityPalette() {
     const palette = document.getElementById('activity-palette');
     palette.innerHTML = '';
-    availableActivities.forEach(activity => {
+    availableActivities.forEach((activity, idx) => {
         const badge = document.createElement('div');
         badge.className = 'activity-palette-item';
-        badge.textContent = activity.name;
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = activity.name;
+        badge.appendChild(nameSpan);
         badge.style.background = activity.color;
         badge.style.color = isColorDark(activity.color) ? '#fff' : '#222';
         badge.setAttribute('draggable', 'true');
-        // Drag logic
         badge.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', activity.name);
         });
-        // Click-to-assign for accessibility
-        badge.addEventListener('click', () => {
+        badge.addEventListener('click', (e) => {
+            if (e.target !== badge && e.target !== nameSpan) return;
             const campName = campSelector.value;
             if (!campName || !campGroups[campName] || campGroups[campName].length === 0) {
                 showAlert('Please add a group to assign activities.');
                 return;
             }
-            // If a cell is selected, assign to that cell
             if (selectedCellInfo) {
                 const { groupIndex, activityIndex } = selectedCellInfo;
                 if (campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
@@ -179,7 +211,6 @@ function renderActivityPalette() {
                 loadGroupsForCamp(campName);
                 return;
             }
-            // Fallback: assign to first empty row in any group
             let assigned = false;
             for (let g = 0; g < campGroups[campName].length; g++) {
                 const group = campGroups[campName][g];
@@ -191,13 +222,165 @@ function renderActivityPalette() {
                     break;
                 }
             }
-            // If no empty slot, add to the first group
             if (!assigned) {
                 campGroups[campName][0].activities.push({ name: activity.name, time: '09:00' });
             }
             loadGroupsForCamp(campName);
         });
+        // --- Always show edit/delete for user-created activities (not in fixed palette) ---
+        // Fallback: If idx >= fixedActivityPalette.length, treat as user-created
+        const isUserActivity = !window.fixedActivityPalette.includes(activity.color) || idx >= window.fixedActivityPalette.length;
+        if (isUserActivity) {
+            // Edit icon
+            const editIcon = document.createElement('i');
+            editIcon.className = 'fas fa-edit';
+            editIcon.title = 'Edit Activity';
+            editIcon.style.marginLeft = '8px';
+            editIcon.style.cursor = 'pointer';
+            editIcon.style.color = '#007bff';
+            editIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                showModalInputWithColor('Edit activity:', (newName, newColor) => {
+                    const trimmedName = newName.trim();
+                    if (!trimmedName) return;
+                    if (availableActivities.some((a, i) => a.name === trimmedName && i !== idx)) {
+                        showAlert(`Activity "${trimmedName}" is already in the available list.`);
+                        return;
+                    }
+                    activity.name = trimmedName;
+                    activity.color = newColor;
+                    renderActivityPalette();
+                }, activity.name, activity.color);
+            });
+            badge.appendChild(editIcon);
+            // Delete icon
+            const deleteIcon = document.createElement('i');
+            deleteIcon.className = 'fas fa-trash-alt';
+            deleteIcon.title = 'Delete Activity';
+            deleteIcon.style.marginLeft = '8px';
+            deleteIcon.style.cursor = 'pointer';
+            deleteIcon.style.color = '#d9534f';
+            deleteIcon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                Swal.fire({
+                    title: 'Delete Activity?',
+                    text: `Are you sure you want to delete "${activity.name}" from the palette? This will not remove it from existing schedules, only from the palette for new assignments.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        availableActivities.splice(idx, 1);
+                        renderActivityPalette();
+                    }
+                });
+            });
+            badge.appendChild(deleteIcon);
+        }
         palette.appendChild(badge);
+    });
+
+    // After rendering all activities, add the Edit Activities button (always at end, only one)
+    let editBtn = document.getElementById('edit-activities-button');
+    if (editBtn) editBtn.remove(); // Remove any existing button to avoid duplicates
+    editBtn = document.createElement('button');
+    editBtn.id = 'edit-activities-button';
+    editBtn.textContent = 'Edit Activities';
+    editBtn.style.marginLeft = '12px';
+    editBtn.style.fontSize = '14px';
+    editBtn.style.padding = '4px 10px';
+    editBtn.style.borderRadius = '5px';
+    editBtn.style.border = '1px solid #007bff';
+    editBtn.style.background = '#f8f9fa';
+    editBtn.style.cursor = 'pointer';
+    editBtn.style.color = '#007bff';
+    editBtn.addEventListener('mouseenter', () => editBtn.style.background = '#e9ecef');
+    editBtn.addEventListener('mouseleave', () => editBtn.style.background = '#f8f9fa');
+    editBtn.addEventListener('click', showEditActivitiesModal);
+    palette.appendChild(editBtn);
+}
+
+// Add Edit Activities button to the UI (next to Add Activity button)
+// const activityPaletteHeader = document.getElementById('activity-palette-header') || document.getElementById('activity-palette');
+// if (activityPaletteHeader) {
+//     const editActivitiesBtn = document.createElement('button');
+//     editActivitiesBtn.id = 'edit-activities-button';
+//     editActivitiesBtn.textContent = 'Edit Activities';
+//     editActivitiesBtn.style.marginLeft = '12px';
+//     editActivitiesBtn.style.fontSize = '14px';
+//     editActivitiesBtn.style.padding = '4px 10px';
+//     editActivitiesBtn.style.borderRadius = '5px';
+//     editActivitiesBtn.style.border = '1px solid #007bff';
+//     editActivitiesBtn.style.background = '#f8f9fa';
+//     editActivitiesBtn.style.cursor = 'pointer';
+//     editActivitiesBtn.style.color = '#007bff';
+//     editActivitiesBtn.addEventListener('mouseenter', () => editActivitiesBtn.style.background = '#e9ecef');
+//     editActivitiesBtn.addEventListener('mouseleave', () => editActivitiesBtn.style.background = '#f8f9fa');
+//     activityPaletteHeader.appendChild(editActivitiesBtn);
+//     editActivitiesBtn.addEventListener('click', showEditActivitiesModal);
+// }
+
+function showEditActivitiesModal() {
+    // Build HTML for all activities with edit/delete icons
+    let html = '<div style="text-align:left;">';
+    if (availableActivities.length === 0) {
+        html += '<div style="margin:10px 0;">No activities available.</div>';
+    } else {
+        availableActivities.forEach((activity, idx) => {
+            html += `<div style='display:flex;align-items:center;margin-bottom:8px;'>` +
+                `<span style='display:inline-block;width:18px;height:18px;border-radius:50%;background:${activity.color};margin-right:8px;border:1px solid #ccc;'></span>` +
+                `<span style='flex:1;'>${activity.name}</span>` +
+                `<i class='fas fa-edit' title='Edit' style='color:#007bff;cursor:pointer;margin-left:10px;' onclick='window._editActivityFromModal(${idx})'></i>` +
+                `<i class='fas fa-trash-alt' title='Delete' style='color:#d9534f;cursor:pointer;margin-left:10px;' onclick='window._deleteActivityFromModal(${idx})'></i>` +
+                `</div>`;
+        });
+    }
+    html += '</div>';
+    Swal.fire({
+        title: 'Edit Activities',
+        html,
+        showCancelButton: true,
+        showConfirmButton: false,
+        width: 420,
+        didOpen: () => {
+            window._editActivityFromModal = function(idx) {
+                const activity = availableActivities[idx];
+                showModalInputWithColor('Edit activity:', (newName, newColor) => {
+                    const trimmedName = newName.trim();
+                    if (!trimmedName) return;
+                    if (availableActivities.some((a, i) => a.name === trimmedName && i !== idx)) {
+                        showAlert(`Activity "${trimmedName}" is already in the available list.`);
+                        return;
+                    }
+                    activity.name = trimmedName;
+                    activity.color = newColor;
+                    renderActivityPalette();
+                    showEditActivitiesModal();
+                }, activity.name, activity.color);
+            };
+            window._deleteActivityFromModal = function(idx) {
+                const activity = availableActivities[idx];
+                Swal.fire({
+                    title: 'Delete Activity?',
+                    text: `Are you sure you want to delete "${activity.name}" from the palette? This will not remove it from existing schedules, only from the palette for new assignments.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Delete',
+                    cancelButtonText: 'Cancel'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        availableActivities.splice(idx, 1);
+                        renderActivityPalette();
+                        showEditActivitiesModal();
+                    }
+                });
+            };
+        },
+        willClose: () => {
+            delete window._editActivityFromModal;
+            delete window._deleteActivityFromModal;
+        }
     });
 }
 
@@ -207,12 +390,13 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
 
     const cellTime = row.insertCell();
     const timeSelector = createCustomTimeSelector(activity.time);
+    cellTime.appendChild(timeSelector);
+    // Only use native <input type="time">, no flatpickr
     timeSelector.addEventListener('change', (e) => {
         if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
             campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
         }
     });
-    cellTime.appendChild(timeSelector);
 
     const cellActivity = row.insertCell();
     cellActivity.textContent = activity.name || '';
@@ -244,7 +428,7 @@ function addActivityToTable(activity, tableBody, campName, groupIndex, activityI
     const deleteActivityIcon = document.createElement('i');
     deleteActivityIcon.className = 'fas fa-times action-icon';
     deleteActivityIcon.title = 'Delete Activity';
-    deleteActivityIcon.style.color = '#d9534f';
+    deleteActivityIcon.style.color = '#222'; // Changed from red to black for visibility
     deleteActivityIcon.style.cursor = 'pointer';
     deleteActivityIcon.style.marginLeft = '10px';
     deleteActivityIcon.addEventListener('click', () => {
@@ -345,17 +529,29 @@ if (exportCampButton) {
         currentY += 40;
 
         // Add the camp information section FIRST
-        doc.setFontSize(16);
-        doc.setFont(undefined, 'bold');
-        doc.text('Camp Information:', pageMargin, currentY);
-        currentY += 18;
-        currentY = checkPageOverflow(doc, currentY, pageHeight, pageMargin); // Check for overflow
-
-        doc.setFontSize(10);
+        doc.setFontSize(11);
         doc.setFont(undefined, 'normal');
-        const infoLinesForPdf = doc.splitTextToSize(campDataForExport, contentWidth);
-        doc.text(infoLinesForPdf, pageMargin, currentY);
-        currentY += (infoLinesForPdf.length * 10) + 50; // Add extra padding after info section
+        // Improved: preserve paragraphs and line breaks, and ensure first line is always a paragraph
+        let infoText = campDataForExport;
+        // If the first line does not end with a line break, add one (for consistent formatting)
+        if (!infoText.startsWith('\n') && !infoText.includes('\n')) {
+            infoText += '\n';
+        } else if (infoText.indexOf('\n') > 0 && infoText[infoText.indexOf('\n')-1] !== '\n') {
+            // If the first paragraph is not followed by a blank line, add one
+            infoText = infoText.replace(/^(.*?\n)/, '$1\n');
+        }
+        const infoParagraphs = infoText.split('\n');
+        let infoY = currentY;
+        infoParagraphs.forEach(paragraph => {
+            if (paragraph.trim() === '') {
+                infoY += 8; // Extra space for blank lines
+                return;
+            }
+            const lines = doc.splitTextToSize(paragraph, contentWidth);
+            doc.text(lines, pageMargin, infoY);
+            infoY += lines.length * 12 + 4; // 12pt line height, 4pt between paragraphs
+        });
+        currentY = infoY + 20; // Add extra space after info section
         currentY = checkPageOverflow(doc, currentY, pageHeight, pageMargin); // Check for overflow
 
         // Groups and Activities
@@ -612,11 +808,10 @@ function restoreSchedule(data) {
     updateCampInterface();
     if (camps.length > 0) {
         campSelector.value = camps[0];
-        loadGroupsForCamp(camps[0]);
+        loadGroupsForCamp(camps[0]); // This will call renderActivityPalette()
     } else {
-        loadGroupsForCamp(null);
+        loadGroupsForCamp(null); // This will call renderActivityPalette()
     }
-    renderActivityPalette();
 }
 
 // Patch updateCampInterface and restoreSchedule to sync info box
@@ -633,7 +828,9 @@ restoreSchedule = function(data) {
     // (If you want to add extra logic after restore, do it here)
 };
 
-// Firestore Cloud Sync ---
+// FIREBASE DATABASE SUPPORT IS ENABLED BELOW
+// (Firestore SDK is loaded in index.html, and window.firebaseDb is used for cloud sync)
+// All Firestore database sync logic is preserved.
 // Use window.firebaseDb (set in index.html)
 // Firestore document path for all schedule data (single-user, single-camp)
 const FIRESTORE_DOC_PATH = 'schedules/main';
@@ -690,7 +887,20 @@ async function loadScheduleFromFirestore() {
 // Patch Save/Load buttons to use Firestore
 if (saveScheduleButton) {
     saveScheduleButton.addEventListener('click', async () => {
-        await saveScheduleToFirestore();
+        // Ask for confirmation before saving
+        const result = await Swal.fire({
+            title: 'Save Schedule?',
+            text: 'Do you want to save the current schedule to the cloud? This will overwrite any previous saved schedule.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Save',
+            cancelButtonText: 'Cancel'
+        });
+        if (result.isConfirmed) {
+            await saveScheduleToFirestore();
+        } else {
+            Swal.fire('Not Saved', 'Your schedule was not saved to the cloud.', 'info');
+        }
     });
 }
 if (loadScheduleButton) {
@@ -747,7 +957,29 @@ function loadGroupsForCamp(campName) {
 
 // Make activity cells droppable for drag-and-drop assignment
 function makeActivityCellsDroppable() {
-    document.querySelectorAll('.group-table tbody td:nth-child(2)').forEach(cell => {
+    document.querySelectorAll('.group-table tbody td:nth-child(2)').forEach((cell, cellIdx) => {
+        // Enable drag for cells with an activity
+        if (cell.textContent.trim() && cell.textContent.trim() !== '') {
+            cell.setAttribute('draggable', 'true');
+            cell.ondragstart = (e) => {
+                // Find group and row index
+                const row = cell.parentElement;
+                const table = row.closest('table');
+                const groupBox = table.closest('.group');
+                const campName = campSelector.value;
+                const groupIndex = Array.from(document.querySelectorAll('.group')).indexOf(groupBox);
+                const activityIndex = Array.from(row.parentElement.children).indexOf(row);
+                e.dataTransfer.setData('text/plain', JSON.stringify({
+                    type: 'table-activity',
+                    campName,
+                    groupIndex,
+                    activityIndex
+                }));
+            };
+        } else {
+            cell.removeAttribute('draggable');
+            cell.ondragstart = null;
+        }
         cell.ondragover = (e) => {
             e.preventDefault();
             cell.classList.add('drag-over');
@@ -758,74 +990,36 @@ function makeActivityCellsDroppable() {
         cell.ondrop = (e) => {
             e.preventDefault();
             cell.classList.remove('drag-over');
-            const activityName = e.dataTransfer.getData('text/plain');
-            if (!activityName) return;
-            // Find the group and row index
+            const data = e.dataTransfer.getData('text/plain');
+            let parsed;
+            try { parsed = JSON.parse(data); } catch { parsed = null; }
             const row = cell.parentElement;
             const table = row.closest('table');
             const groupBox = table.closest('.group');
             const campName = campSelector.value;
             const groupIndex = Array.from(document.querySelectorAll('.group')).indexOf(groupBox);
             const activityIndex = Array.from(row.parentElement.children).indexOf(row);
-            if (campGroups[campName] && campGroups[campName][groupIndex]) {
-                campGroups[campName][groupIndex].activities[activityIndex].name = activityName;
+            if (parsed && parsed.type === 'table-activity') {
+                // Move activity from source to target
+                const srcGroup = campGroups[parsed.campName][parsed.groupIndex];
+                const srcActivity = srcGroup.activities[parsed.activityIndex];
+                if (!srcActivity) return;
+                // Remove from source
+                srcGroup.activities.splice(parsed.activityIndex, 1);
+                // Insert at target
+                campGroups[campName][groupIndex].activities.splice(activityIndex, 0, srcActivity);
+                loadGroupsForCamp(campName);
+            } else {
+                // Palette drag fallback (existing logic)
+                const activityName = data;
+                if (!activityName) return;
+                if (campGroups[campName] && campGroups[campName][groupIndex]) {
+                    campGroups[campName][groupIndex].activities[activityIndex].name = activityName;
+                }
+                loadGroupsForCamp(campName);
             }
-            loadGroupsForCamp(campName);
         };
     });
-}
-
-// Patch addActivityToTable to always call makeActivityCellsDroppable after rendering
-function addActivityToTable(activity, tableBody, campName, groupIndex, activityIndex) {
-    const row = tableBody.insertRow();
-
-    const cellTime = row.insertCell();
-    const timeSelector = createCustomTimeSelector(activity.time);
-    timeSelector.addEventListener('change', (e) => {
-        if (campGroups[campName] && campGroups[campName][groupIndex] && campGroups[campName][groupIndex].activities[activityIndex]) {
-            campGroups[campName][groupIndex].activities[activityIndex].time = e.target.value;
-        }
-    });
-    cellTime.appendChild(timeSelector);
-
-    const cellActivity = row.insertCell();
-    cellActivity.textContent = activity.name || '';
-    if (activity.name) {
-        const bg = getActivityColor(activity.name);
-        cellActivity.style.background = bg;
-        cellActivity.style.color = isColorDark(bg) ? '#fff' : '#222';
-    } else {
-        cellActivity.style.background = '';
-        cellActivity.style.color = '';
-        // Allow click-to-select for empty cells
-        cellActivity.style.cursor = 'pointer';
-        cellActivity.onclick = (e) => {
-            // Deselect previous
-            clearSelectedCell();
-            // Select this cell
-            cellActivity.classList.add('selected-activity-cell');
-            selectedCellInfo = { groupIndex, activityIndex, cellElement: cellActivity };
-            // Optionally, scroll palette into view for accessibility
-            document.getElementById('activity-palette').scrollIntoView({ behavior: 'smooth', block: 'center' });
-        };
-    }
-    // Always make droppable
-    makeActivityCellsDroppable();
-
-    // Add delete icon
-    const deleteActivityIcon = document.createElement('i');
-    deleteActivityIcon.className = 'fas fa-times action-icon';
-    deleteActivityIcon.title = 'Delete Activity';
-    deleteActivityIcon.style.color = '#d9534f';
-    deleteActivityIcon.style.cursor = 'pointer';
-    deleteActivityIcon.style.marginLeft = '10px';
-    deleteActivityIcon.addEventListener('click', () => {
-        campGroups[campName][groupIndex].activities.splice(activityIndex, 1);
-        loadGroupsForCamp(campName);
-    });
-    cellActivity.appendChild(deleteActivityIcon);
-
-    setTimeout(() => enableActivityRowReordering(tableBody, campName, groupIndex), 0);
 }
 
 // Implement loadActivitiesForGroup
@@ -1021,97 +1215,5 @@ function editCampName(oldName) {
         updateCampInterface();
         campSelector.value = newName;
         loadGroupsForCamp(newName);
-        // Removed auto-save here
     });
 }
-
-// Utility: Create a time selector input for activity rows
-function createCustomTimeSelector(value) {
-    const input = document.createElement('input');
-    input.type = 'time';
-    input.value = value || '09:00';
-    input.style.width = '80px';
-    input.style.fontSize = '14px';
-    input.style.padding = '2px 4px';
-    input.style.border = '1px solid #ccc';
-    input.style.borderRadius = '4px';
-    return input;
-}
-
-// Utility: Stub for activity row reordering (no-op)
-function enableActivityRowReordering(tableBody, campName, groupIndex) {
-    if (!tableBody) return;
-    // Remove any previous drag event listeners to avoid duplicates
-    Array.from(tableBody.rows).forEach(row => {
-        row.draggable = true;
-        row.ondragstart = null;
-        row.ondragover = null;
-        row.ondrop = null;
-        row.ondragenter = null;
-        row.ondragleave = null;
-    });
-    let dragSrcIdx = null;
-    Array.from(tableBody.rows).forEach((row, idx) => {
-        row.draggable = true;
-        row.ondragstart = (e) => {
-            dragSrcIdx = idx;
-            row.classList.add('dragging-row');
-            e.dataTransfer.effectAllowed = 'move';
-        };
-        row.ondragover = (e) => {
-            e.preventDefault();
-            row.classList.add('drag-over-row');
-        };
-        row.ondragleave = (e) => {
-            row.classList.remove('drag-over-row');
-        };
-        row.ondrop = (e) => {
-            e.preventDefault();
-            row.classList.remove('drag-over-row');
-            const dragDestIdx = idx;
-            if (dragSrcIdx === null || dragDestIdx === null || dragSrcIdx === dragDestIdx) return;
-            // Move activity in data model
-            const activities = campGroups[campName][groupIndex].activities;
-            const [moved] = activities.splice(dragSrcIdx, 1);
-            activities.splice(dragDestIdx, 0, moved);
-            loadGroupsForCamp(campName);
-        };
-        row.ondragend = (e) => {
-            row.classList.remove('dragging-row');
-            dragSrcIdx = null;
-        };
-    });
-}
-
-// --- Saving Indicator ---
-let savingIndicator = null;
-function showSavingIndicator() {
-    if (!savingIndicator) {
-        savingIndicator = document.createElement('div');
-        savingIndicator.id = 'saving-indicator';
-        savingIndicator.style.position = 'fixed';
-        savingIndicator.style.bottom = '20px';
-        savingIndicator.style.right = '20px';
-        savingIndicator.style.background = '#007bff';
-        savingIndicator.style.color = '#fff';
-        savingIndicator.style.padding = '8px 18px';
-        savingIndicator.style.borderRadius = '6px';
-        savingIndicator.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-        savingIndicator.style.zIndex = 9999;
-        savingIndicator.style.fontSize = '16px';
-        savingIndicator.textContent = 'Saving...';
-        document.body.appendChild(savingIndicator);
-    }
-    savingIndicator.style.display = 'block';
-}
-function hideSavingIndicator() {
-    if (savingIndicator) savingIndicator.style.display = 'none';
-}
-
-// --- Debounced Auto-Save ---
-// REMOVE autoSaveToFirestore and patchAutoSave
-// --- Remove all auto-save triggers ---
-// (No-op: all auto-save logic removed)
-
-// Patch all mutating actions to auto-save
-// REMOVE patchAutoSave();
