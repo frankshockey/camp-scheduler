@@ -962,6 +962,11 @@ campSelector.addEventListener('change', () => {
     currentCampHeading.textContent = `Current Camp: ${selectedCamp}`;
     loadGroupsForCamp(selectedCamp);
     updateInfoBoxForSelectedCamp(); // Ensure camp info updates automatically
+    // --- Add this to sync campDropdown and infoBox ---
+    if (campDropdown) {
+        campDropdown.value = selectedCamp;
+        updateInfoBoxForSelectedCamp();
+    }
 });
 
 function loadGroupsForCamp(campName) {
