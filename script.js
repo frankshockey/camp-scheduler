@@ -105,6 +105,11 @@ function showScrollableTimePicker(currentValue, callback) {
                     if (typeof callback === 'function') callback(t);
                 });
             });
+            // Scroll to the current time option for better UX
+            const currentOpt = document.querySelector('.swal-time-option[style*="background:#e9ecef"]');
+            if (currentOpt) {
+                currentOpt.scrollIntoView({ block: 'center' });
+            }
         }
     });
 }
@@ -1148,7 +1153,18 @@ function createGroupBox(groupName, groupIndex, campName) {
         e.stopPropagation();
         const group = campGroups[campName][groupIndex];
         if (!group.activities) group.activities = [];
-        group.activities.push({ time: '09:00', name: '' });
+        let newTime = '09:00';
+        if (group.activities.length > 0) {
+            // Get last activity's time
+            const lastTime = group.activities[group.activities.length - 1].time || '09:00';
+            // Parse and increment by 5 minutes
+            let [h, m] = lastTime.split(':').map(Number);
+            m += 5;
+            if (m >= 60) { h += 1; m = 0; }
+            if (h > 22) { h = 22; m = 0; } // Clamp to 22:00 max
+            newTime = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+        group.activities.push({ time: newTime, name: '' });
         loadGroupsForCamp(campName);
     });
 
