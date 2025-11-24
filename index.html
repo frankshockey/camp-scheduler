@@ -59,6 +59,118 @@
                     Click here to add information about the selected camp.
                 </div>
             </div>
+
+            <!-- Hockey GM Lab -->
+            <section id="gm-section">
+                <div class="gm-header">
+                    <div>
+                        <h2>Hockey GM Lab</h2>
+                        <p>Build a roster, track the salary cap, and plan trades from a single dashboard.</p>
+                    </div>
+                    <div class="gm-summary-grid">
+                        <div class="gm-summary-card">
+                            <span class="gm-label">Team Name</span>
+                            <div class="gm-value" id="gm-team-name-display">Expansion HC</div>
+                        </div>
+                        <div class="gm-summary-card">
+                            <span class="gm-label">Cap Limit</span>
+                            <div class="gm-value" id="gm-cap-limit-display">$83.5M</div>
+                        </div>
+                        <div class="gm-summary-card">
+                            <span class="gm-label">Cap Used</span>
+                            <div class="gm-value" id="gm-cap-used">$0</div>
+                        </div>
+                        <div class="gm-summary-card">
+                            <span class="gm-label">Cap Space</span>
+                            <div class="gm-value" id="gm-cap-space">$83.5M</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="gm-controls">
+                    <div class="gm-card">
+                        <h3>Team Settings</h3>
+                        <label for="gm-team-name">Team name</label>
+                        <input id="gm-team-name" type="text" placeholder="e.g., Seattle Orcas">
+
+                        <label for="gm-cap-limit">Salary cap (in millions)</label>
+                        <input id="gm-cap-limit" type="number" step="0.1" min="40" max="120" value="83.5">
+
+                        <button id="gm-apply-settings" class="gm-primary">Update team profile</button>
+                        <button id="gm-load-template" class="gm-secondary">Load sample roster</button>
+                    </div>
+
+                    <div class="gm-card">
+                        <h3>Add Player</h3>
+                        <form id="gm-player-form">
+                            <div class="gm-form-grid">
+                                <label>Name<input id="gm-player-name" type="text" required></label>
+                                <label>Position
+                                    <select id="gm-player-position" required>
+                                        <option value="C">Center</option>
+                                        <option value="LW">Left Wing</option>
+                                        <option value="RW">Right Wing</option>
+                                        <option value="D">Defense</option>
+                                        <option value="G">Goalie</option>
+                                    </select>
+                                </label>
+                                <label>Cap hit (M)<input id="gm-player-cap" type="number" step="0.1" min="0" required></label>
+                                <label>Term (yrs)
+                                    <select id="gm-player-term">
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                        <option value="6">6</option>
+                                        <option value="7">7</option>
+                                        <option value="8">8</option>
+                                    </select>
+                                </label>
+                            </div>
+                            <label>Status
+                                <select id="gm-player-status">
+                                    <option value="Roster">Roster</option>
+                                    <option value="Prospect">Prospect</option>
+                                    <option value="IR">Injured Reserve</option>
+                                </select>
+                            </label>
+                            <div class="gm-form-actions">
+                                <button type="submit" class="gm-primary">Add to roster</button>
+                                <button type="button" id="gm-add-trade-block" class="gm-secondary">Add to trade block</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="gm-roster-grid">
+                    <div class="gm-card full-width">
+                        <div class="gm-card-header">
+                            <h3>Active Roster</h3>
+                            <span class="gm-subtitle" id="gm-roster-count">0 players</span>
+                        </div>
+                        <table class="gm-table" id="gm-roster-table">
+                            <thead>
+                                <tr><th>Name</th><th>Pos</th><th>Cap Hit</th><th>Term</th><th>Status</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+
+                    <div class="gm-card full-width">
+                        <div class="gm-card-header">
+                            <h3>Trade Block</h3>
+                            <span class="gm-subtitle" id="gm-trade-count">0 players</span>
+                        </div>
+                        <table class="gm-table" id="gm-trade-table">
+                            <thead>
+                                <tr><th>Name</th><th>Pos</th><th>Cap Hit</th><th>Term</th><th>Status</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
         </div>
     </main>
     <!-- Firebase App (the core SDK) compat version -->

@@ -270,3 +270,205 @@ input[type="time"]:focus {
 input[type="time"]:hover {
   border-color: #339cff;
 }
+
+/* Hockey GM Lab styles */
+#gm-section {
+  margin-top: 40px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+}
+
+.gm-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.gm-header h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.gm-header p {
+  margin: 4px 0 0;
+  color: #4b5563;
+}
+
+.gm-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  min-width: 280px;
+}
+
+.gm-summary-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.gm-label {
+  display: block;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.gm-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.gm-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.gm-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.gm-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.gm-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.gm-card label {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.gm-card input,
+.gm-card select {
+  width: 100%;
+  padding: 8px 10px;
+  margin-top: 4px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+}
+
+.gm-primary,
+.gm-secondary {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.gm-primary {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(37,99,235,0.2);
+}
+
+.gm-secondary {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.gm-primary:hover,
+.gm-secondary:hover {
+  transform: translateY(-1px);
+}
+
+.gm-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.gm-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.gm-roster-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.gm-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gm-subtitle {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.gm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.gm-table th,
+.gm-table td {
+  padding: 10px 8px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.gm-table th {
+  background: #f3f4f6;
+  font-weight: 700;
+}
+
+.gm-tag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.gm-action {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+  margin-right: 6px;
+}
+
+.gm-danger {
+  color: #b91c1c;
+}
+
+@media (max-width: 720px) {
+  .gm-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
