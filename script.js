@@ -1281,3 +1281,173 @@ function editCampName(oldName) {
         loadGroupsForCamp(newName);
     });
 }
+
+// ------------------------------
+// Hockey GM Lab
+// ------------------------------
+const gmState = {
+    teamName: 'Expansion HC',
+    capLimit: 83.5,
+    roster: [],
+    tradeBlock: [],
+};
+
+const gmTeamNameDisplay = document.getElementById('gm-team-name-display');
+const gmCapLimitDisplay = document.getElementById('gm-cap-limit-display');
+const gmCapUsed = document.getElementById('gm-cap-used');
+const gmCapSpace = document.getElementById('gm-cap-space');
+const gmTeamNameInput = document.getElementById('gm-team-name');
+const gmCapLimitInput = document.getElementById('gm-cap-limit');
+const gmApplySettingsButton = document.getElementById('gm-apply-settings');
+const gmLoadTemplateButton = document.getElementById('gm-load-template');
+const gmPlayerForm = document.getElementById('gm-player-form');
+const gmPlayerNameInput = document.getElementById('gm-player-name');
+const gmPlayerPositionInput = document.getElementById('gm-player-position');
+const gmPlayerCapInput = document.getElementById('gm-player-cap');
+const gmPlayerTermInput = document.getElementById('gm-player-term');
+const gmPlayerStatusInput = document.getElementById('gm-player-status');
+const gmAddTradeBlockButton = document.getElementById('gm-add-trade-block');
+const gmRosterTableBody = document.querySelector('#gm-roster-table tbody');
+const gmTradeTableBody = document.querySelector('#gm-trade-table tbody');
+const gmRosterCount = document.getElementById('gm-roster-count');
+const gmTradeCount = document.getElementById('gm-trade-count');
+
+function formatCap(value) {
+    const numeric = Number(value) || 0;
+    return `$${numeric.toFixed(1)}M`;
+}
+
+function updateGmSummary() {
+    const capUsed = [...gmState.roster, ...gmState.tradeBlock].reduce((sum, player) => sum + (Number(player.capHit) || 0), 0);
+    const capSpace = Math.max(0, gmState.capLimit - capUsed);
+
+    gmTeamNameDisplay.textContent = gmState.teamName || 'Expansion HC';
+    gmCapLimitDisplay.textContent = formatCap(gmState.capLimit);
+    gmCapUsed.textContent = formatCap(capUsed);
+    gmCapSpace.textContent = formatCap(capSpace);
+
+    gmRosterCount.textContent = `${gmState.roster.length} players`;
+    gmTradeCount.textContent = `${gmState.tradeBlock.length} players`;
+}
+
+function buildPlayerRow(player, location, index) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td>${player.name}</td>
+        <td>${player.position}</td>
+        <td>${formatCap(player.capHit)}</td>
+        <td>${player.term} yr${player.term > 1 ? 's' : ''}</td>
+        <td><span class="gm-tag">${player.status}</span></td>
+        <td></td>
+    `;
+
+    const actionsCell = tr.querySelector('td:last-child');
+
+    const moveButton = document.createElement('button');
+    moveButton.className = 'gm-action';
+    if (location === 'roster') {
+        moveButton.textContent = 'Move to trade block';
+        moveButton.addEventListener('click', () => movePlayer(index, 'roster', 'tradeBlock'));
+    } else {
+        moveButton.textContent = 'Return to roster';
+        moveButton.addEventListener('click', () => movePlayer(index, 'tradeBlock', 'roster'));
+    }
+
+    const removeButton = document.createElement('button');
+    removeButton.className = 'gm-action gm-danger';
+    removeButton.textContent = 'Remove';
+    removeButton.addEventListener('click', () => removePlayer(index, location));
+
+    actionsCell.appendChild(moveButton);
+    actionsCell.appendChild(removeButton);
+    return tr;
+}
+
+function renderGmTables() {
+    gmRosterTableBody.innerHTML = '';
+    gmTradeTableBody.innerHTML = '';
+
+    gmState.roster.forEach((player, idx) => {
+        gmRosterTableBody.appendChild(buildPlayerRow(player, 'roster', idx));
+    });
+
+    gmState.tradeBlock.forEach((player, idx) => {
+        gmTradeTableBody.appendChild(buildPlayerRow(player, 'tradeBlock', idx));
+    });
+
+    updateGmSummary();
+}
+
+function addPlayer(destination = 'roster') {
+    const name = gmPlayerNameInput.value.trim();
+    const capHit = parseFloat(gmPlayerCapInput.value);
+    if (!name || isNaN(capHit)) {
+        showAlert('Please add a player name and cap hit.');
+        return;
+    }
+    const player = {
+        name,
+        position: gmPlayerPositionInput.value,
+        capHit: capHit,
+        term: parseInt(gmPlayerTermInput.value, 10) || 1,
+        status: gmPlayerStatusInput.value,
+    };
+
+    gmState[destination].push(player);
+    renderGmTables();
+    gmPlayerForm.reset();
+    gmPlayerPositionInput.value = 'C';
+}
+
+function movePlayer(index, from, to) {
+    const [player] = gmState[from].splice(index, 1);
+    gmState[to].push(player);
+    renderGmTables();
+}
+
+function removePlayer(index, from) {
+    gmState[from].splice(index, 1);
+    renderGmTables();
+}
+
+function loadSampleRoster() {
+    gmState.roster = [
+        { name: 'Amelia Novak', position: 'C', capHit: 8.0, term: 6, status: 'Roster' },
+        { name: 'Kai Martin', position: 'LW', capHit: 6.5, term: 5, status: 'Roster' },
+        { name: 'Santiago Cruz', position: 'RW', capHit: 4.2, term: 3, status: 'Prospect' },
+        { name: 'Jules Carter', position: 'D', capHit: 7.3, term: 7, status: 'Roster' },
+        { name: 'Noah Rasmussen', position: 'G', capHit: 5.1, term: 4, status: 'Roster' },
+    ];
+    gmState.tradeBlock = [
+        { name: 'Evan Duclair', position: 'D', capHit: 2.2, term: 1, status: 'Roster' },
+    ];
+    renderGmTables();
+}
+
+if (gmApplySettingsButton) {
+    gmApplySettingsButton.addEventListener('click', () => {
+        gmState.teamName = gmTeamNameInput.value.trim() || gmState.teamName;
+        const limit = parseFloat(gmCapLimitInput.value);
+        if (!isNaN(limit) && limit > 0) {
+            gmState.capLimit = limit;
+        }
+        updateGmSummary();
+    });
+}
+
+if (gmLoadTemplateButton) {
+    gmLoadTemplateButton.addEventListener('click', loadSampleRoster);
+}
+
+if (gmPlayerForm) {
+    gmPlayerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        addPlayer('roster');
+    });
+}
+
+if (gmAddTradeBlockButton) {
+    gmAddTradeBlockButton.addEventListener('click', () => addPlayer('tradeBlock'));
+}
+
+renderGmTables();
